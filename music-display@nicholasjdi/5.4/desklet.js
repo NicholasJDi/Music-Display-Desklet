@@ -8,8 +8,7 @@ const Pango = imports.gi.Pango;
 const Settings = imports.ui.settings;
 const St = imports.gi.St;
 
-const UUID = "dual-datetime@rcalixte";
-const DATETIME_URL = "https://man7.org/linux/man-pages/man1/date.1.html";
+const UUID = "music-display@nicholasjdi";
 
 // l10n/translation support
 Gettext.bindtextdomain(UUID, GLib.get_home_dir() + "/.local/share/locale");
@@ -24,11 +23,11 @@ const ST_ALIGNMENT = {
     "right": St.Align.END
 };
 
-function DateTimeDesklet(metadata, desklet_id) {
+function MusicDisplayDesklet(metadata, desklet_id) {
     this._init(metadata, desklet_id);
 }
 
-DateTimeDesklet.prototype = {
+MusicDisplayDesklet.prototype = {
     __proto__: Desklet.Desklet.prototype,
 
     _init: function (metadata, desklet_id) {
@@ -135,10 +134,6 @@ DateTimeDesklet.prototype = {
         this.timeout = Mainloop.timeout_add_seconds(1, Lang.bind(this, this._updateUI));
     },
 
-    on_datetime_button_clicked: function () {
-        this.launcher.spawnv(["xdg-open", DATETIME_URL]);
-    },
-
     on_desklet_removed: function () {
         Mainloop.source_remove(this.timeout);
     },
@@ -173,5 +168,5 @@ DateTimeDesklet.prototype = {
 };
 
 function main(metadata, desklet_id) {
-    return new DateTimeDesklet(metadata, desklet_id);
+    return new MusicDisplayDesklet(metadata, desklet_id);
 }
