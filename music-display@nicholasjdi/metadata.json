@@ -1,0 +1,8 @@
+{
+    "description": "A Linux Mint Cinnamon Desklet for displaying what is currently being played by Rythembox (and pausing or skipping) while (hopefully) being highly customizable.",
+    "uuid": "music-display@nicholasjdi",
+    "name": "Music Display",
+    "max-instances": "1",
+    "version": "0.1.0",
+    "author": "NicholasJDi",
+}
