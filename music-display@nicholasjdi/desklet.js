@@ -2,7 +2,6 @@ const Desklet = imports.ui.desklet;
 const St = imports.gi.St;
 const Lang = imports.lang;
 const GLib = imports.gi.GLib;
-const Clutter = imports.gi.Clutter;
 
 const POLL_INTERVAL = 1; // seconds
 
@@ -16,34 +15,45 @@ MyDesklet.prototype = {
     _init: function(metadata, instance_id) {
         Desklet.Desklet.prototype._init.call(this, metadata, instance_id);
 
-        // Vertical box to hold label + buttons
-        this.box = new St.BoxLayout({ vertical: true });
-        this.setContent(this.box);
+        // Main vertical box
+        this.mainBox = new St.BoxLayout({ vertical: true });
+        this.setContent(this.mainBox);
 
-        this.label = new St.Label({ text: "Initializing…" });
-        this.box.add_child(this.label);
+        // Row 1: Play/Pause + Title
+        this.row1 = new St.BoxLayout({ vertical: false });
+        this.mainBox.add_child(this.row1);
 
-        // Horizontal box for buttons
-        this.buttonBox = new St.BoxLayout({ vertical: false, style_class: 'desklet-button-box' });
-        this.box.add_child(this.buttonBox);
-
-        this._addButton("⏮️", "playerctl previous");
-        this._addButton("⏯️", "playerctl play-pause");
-        this._addButton("⏭️", "playerctl next");
-
-        this._pollId = null;
-        this._startPolling();
-    },
-
-    _addButton: function(label, command) {
-        let btn = new St.Button({ label: label, style_class: 'desklet-button' });
-        btn.connect('button-press-event', () => {
-            GLib.spawn_command_line_async(command);
+        this.btnPlayPause = new St.Button({ label: "⏯️" });
+        this.btnPlayPause.connect('button-press-event', () => {
+            GLib.spawn_command_line_async('playerctl play-pause');
         });
-        this.buttonBox.add_child(btn);
-    },
+        this.row1.add_child(this.btnPlayPause);
 
-    _startPolling: function() {
+        this.labelTitle = new St.Label({ text: "Loading…" });
+        this.labelTitle.set_x_expand(true);
+        this.row1.add_child(this.labelTitle);
+
+        // Row 2: Previous, Next + Artist
+        this.row2 = new St.BoxLayout({ vertical: false });
+        this.mainBox.add_child(this.row2);
+
+        this.btnPrev = new St.Button({ label: "⏮️" });
+        this.btnPrev.connect('button-press-event', () => {
+            GLib.spawn_command_line_async('playerctl previous');
+        });
+        this.row2.add_child(this.btnPrev);
+
+        this.btnNext = new St.Button({ label: "⏭️" });
+        this.btnNext.connect('button-press-event', () => {
+            GLib.spawn_command_line_async('playerctl next');
+        });
+        this.row2.add_child(this.btnNext);
+
+        this.labelArtist = new St.Label({ text: "" });
+        this.labelArtist.set_x_expand(true);
+        this.row2.add_child(this.labelArtist);
+
+        // Start polling for playback updates
         this._pollId = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
             POLL_INTERVAL,
@@ -52,21 +62,26 @@ MyDesklet.prototype = {
     },
 
     _updateStatus: function() {
+        // Playback status
         let [successStatus, outStatus] = GLib.spawn_command_line_sync('playerctl status');
         let status = (successStatus && outStatus) ? outStatus.toString().trim() : null;
 
         if (!status) {
-            this.label.set_text("No player running.");
+            this.labelTitle.set_text("No player running");
+            this.labelArtist.set_text("");
             return true;
         }
 
+        // Title
         let [successTitle, outTitle] = GLib.spawn_command_line_sync('playerctl metadata xesam:title');
         let title = (successTitle && outTitle) ? outTitle.toString().trim() : "Unknown Title";
 
+        // Artist
         let [successArtist, outArtist] = GLib.spawn_command_line_sync('playerctl metadata xesam:artist');
         let artist = (successArtist && outArtist) ? outArtist.toString().trim() : "Unknown Artist";
 
-        this.label.set_text(`[${status}] ${title} — ${artist}`);
+        this.labelTitle.set_text(title);
+        this.labelArtist.set_text(artist);
 
         return true;
     },
