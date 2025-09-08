@@ -8,11 +8,11 @@ const Settings = imports.ui.settings;
 const DEFAULT_POLL_INTERVAL = 1;
 const DEFAULT_IDLE_POLL_INTERVAL = 3;
 
-function MyDesklet(metadata, instance_id) {
+function MusicDisplayDesklet(metadata, instance_id) {
     this._init(metadata, instance_id);
 }
 
-MyDesklet.prototype = {
+MusicDisplayDesklet.prototype = {
     __proto__: Desklet.Desklet.prototype,
 
     _init: function(metadata, instance_id) {
@@ -398,6 +398,6 @@ MyDesklet.prototype = {
 };
 
 function main(metadata, instance_id) {
-    return new MyDesklet(metadata, instance_id);
+    return new MusicDisplayDesklet(metadata, instance_id);
 }
 

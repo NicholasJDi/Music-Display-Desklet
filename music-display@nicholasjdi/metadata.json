@@ -1,7 +1,7 @@
 {
     "uuid": "music-display@nicholasjdi",
     "name": "Music Display",
-    "description": "A Linux Mint Cinnamon Desklet for displaying what is currently being played by Rythembox (and pausing or skipping) while (hopefully) being highly customizable.",
-    "version": "0.1.0",
+    "description": " A Linux Mint Cinnamon Desklet for displaying what is currently being played by players supporting the MPRIS D-Bus specification using playerctl",
+    "version": "1.0.0",
     "author": "NicholasJDi"
 }
