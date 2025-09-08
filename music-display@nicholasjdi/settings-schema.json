@@ -1,0 +1,125 @@
+{
+    "head1": {
+        "type": "header",
+        "description": "Line 1 Settings"
+    },
+    "line1_format": {
+        "type": "entry",
+        "description": "Format",
+        "default": "%title%",
+        "tooltip": "Use %title%, %artist%, %album% for dynamic display"
+    },
+    "line1_font": {
+        "type": "entry",
+        "description": "Font",
+        "default": ""
+    },
+    "line1_size": {
+        "type": "scale",
+        "description": "Font size",
+        "default": 20,
+        "min": 6,
+        "max": 72,
+        "step": 1
+    },
+
+    "head2": {
+        "type": "header",
+        "description": "Line 2 Settings"
+    },
+    "line2_format": {
+        "type": "entry",
+        "description": "Format",
+        "default": "%artist%",
+        "tooltip": "Use %title%, %artist%, %album% for dynamic display"
+    },
+    "line2_font": {
+        "type": "entry",
+        "description": "Font",
+        "default": ""
+    },
+    "line2_size": {
+        "type": "scale",
+        "description": "Font size",
+        "default": 17,
+        "min": 6,
+        "max": 72,
+        "step": 1
+    },
+
+    "head3": {
+        "type": "header",
+        "description": "Button Settings"
+    },
+    "button_text_spacing": {
+        "type": "scale",
+        "description": "Spacing (pixels) between buttons and text",
+        "default": 7,
+        "min": 0,
+        "max": 50,
+        "step": 1
+    },
+    "hide_all_buttons": {
+        "type": "checkbox",
+        "description": "Hide all buttons",
+        "default": false
+    },
+    "hide_skip_buttons": {
+        "type": "checkbox",
+        "description": "Hide skip buttons (previous/next)",
+        "default": false
+    },
+	"button_size": {
+    "type": "scale",
+    "description": "Button size (pixels)",
+    "default": 32,
+    "min": 8,
+    "max": 128,
+    "step": 1
+	},
+    "btn_play_texture": {
+        "type": "entry",
+        "description": "Play button texture path",
+        "default": ""
+    },
+    "btn_pause_texture": {
+        "type": "entry",
+        "description": "Pause button texture path",
+        "default": ""
+    },
+    "btn_next_texture": {
+        "type": "entry",
+        "description": "Next button texture path",
+        "default": ""
+    },
+    "btn_prev_texture": {
+        "type": "entry",
+        "description": "Previous button texture path",
+        "default": ""
+    },
+
+    "head4": {
+        "type": "header",
+        "description": "Player Settings"
+    },
+	"poll_interval": {
+    "type": "scale",
+    "description": "Player polling interval (seconds)",
+	"tooltip": "How often the desklet check the current song",
+    "default": 1,
+    "min": 0.1,
+    "max": 10,
+    "step": 0.1
+	},
+    "player_whitelist": {
+        "type": "entry",
+        "description": "Comma-separated list of allowed players",
+        "default": "rhythmbox,vlc"
+    },
+    "treat_whitelist_as_blacklist": {
+        "type": "checkbox",
+        "description": "Treat whitelist as blacklist instead",
+        "default": false
+    }
+}
+
