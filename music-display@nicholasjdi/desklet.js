@@ -6,6 +6,7 @@ const Gio = imports.gi.Gio;
 const Settings = imports.ui.settings;
 
 const DEFAULT_POLL_INTERVAL = 1;
+const DEFAULT_IDLE_POLL_INTERVAL = 3;
 
 function MyDesklet(metadata, instance_id) {
     this._init(metadata, instance_id);
@@ -34,11 +35,18 @@ MyDesklet.prototype = {
         this.playerWhitelist = "rhythmbox,vlc";
         this.treatWhitelistAsBlacklist = false;
         this.pollInterval = DEFAULT_POLL_INTERVAL;
+        this.idlePollInterval = DEFAULT_IDLE_POLL_INTERVAL;
 
         this.btnPlayTexture = basePath + "play.png";
         this.btnPauseTexture = basePath + "pause.png";
         this.btnNextTexture = basePath + "next.png";
         this.btnPrevTexture = basePath + "previous.png";
+
+        // Track last displayed info to minimize UI churn
+        this._lastStatus = null;
+        this._lastLine1 = null;
+        this._lastLine2 = null;
+        this._lastPlayPauseFile = null;
 
         // Settings
         this.settings = new Settings.DeskletSettings(this, this.metadata.uuid, instance_id);
@@ -50,6 +58,7 @@ MyDesklet.prototype = {
         this.mainBox = new St.BoxLayout({ vertical: false });
         this.setContent(this.mainBox);
 
+        // Buttons column
         this.buttonVBox = new St.BoxLayout({ vertical: true });
         this.mainBox.add_child(this.buttonVBox);
 
@@ -68,10 +77,11 @@ MyDesklet.prototype = {
         this.btnNext.connect('button-press-event', Lang.bind(this, this._onNextPressed));
         this.skipHBox.add_child(this.btnNext);
 
-        // Dummy spacing widget
-        this.spacingWidget = new St.Widget({ style_class: "spacing-widget", width: this.buttonTextSpacing });
+        // Spacing widget between buttons and text
+        this.spacingWidget = new St.Widget({ style_class: "spacing-widget", reactive: false });
         this.mainBox.add_child(this.spacingWidget);
 
+        // Text column
         this.textVBox = new St.BoxLayout({ vertical: true });
         this.mainBox.add_child(this.textVBox);
 
@@ -81,8 +91,10 @@ MyDesklet.prototype = {
         this.labelArtist = new St.Label({ text: "" });
         this.textVBox.add_child(this.labelArtist);
 
+        // update things when sizing changes
         this.textVBox.connect('notify::allocation', Lang.bind(this, this._updateAll));
 
+        // initial run
         this._updateAll();
         this._startPolling();
     },
@@ -94,6 +106,7 @@ MyDesklet.prototype = {
         settings.bind("line1_format", "line1Format", bind(this, this._updateAll));
         settings.bind("line1_font", "line1Font", bind(this, this._updateAll));
         settings.bind("line1_size", "line1Size", bind(this, this._updateAll));
+
         settings.bind("line2_format", "line2Format", bind(this, this._updateAll));
         settings.bind("line2_font", "line2Font", bind(this, this._updateAll));
         settings.bind("line2_size", "line2Size", bind(this, this._updateAll));
@@ -111,44 +124,122 @@ MyDesklet.prototype = {
         settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", bind(this, this._updateAll));
 
         settings.bind("poll_interval", "pollInterval", bind(this, this._resetPolling));
+        settings.bind("idle_poll_interval", "idlePollInterval", bind(this, this._resetPolling));
     },
 
-    _startPolling: function() {
+    _startPolling: function(idle = false) {
         if (this._pollId) GLib.source_remove(this._pollId);
-        this._pollId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, this.pollInterval, Lang.bind(this, this._updateStatus));
+
+        const interval = idle ? this.idlePollInterval : this.pollInterval;
+        if (interval >= 1) {
+            this._pollId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, Math.max(1, Math.round(interval)), Lang.bind(this, this._updateStatus));
+        } else {
+            let ms = Math.max(50, Math.round(interval * 1000));
+            this._pollId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, Lang.bind(this, this._updateStatus));
+        }
+
+        global.log(`[music-display@nicholasjdi] Starting polling every ${interval}s`);
     },
 
     _resetPolling: function() {
         this._startPolling();
     },
 
-    _getPlayerctlArgs: function() {
-        if (!this.playerWhitelist.trim()) return "";
+    _getPlayerctlArgsArray: function() {
+        if (!this.playerWhitelist || !this.playerWhitelist.toString().trim()) return [];
         const players = this.playerWhitelist.split(",").map(p => p.trim()).filter(p => p.length > 0).join(",");
-        return this.treatWhitelistAsBlacklist ? `--ignore-player=${players}` : `--player=${players}`;
+        if (!players) return [];
+        const flag = this.treatWhitelistAsBlacklist ? `--ignore-player=${players}` : `--player=${players}`;
+        return [flag];
     },
 
-    _runPlayerctl: function(args) {
-        return GLib.spawn_command_line_sync(`playerctl ${this._getPlayerctlArgs()} ${args}`);
+    _runPlayerctlAsync: function(argsArray, callback) {
+        try {
+            const argv = ['playerctl'];
+            const extra = this._getPlayerctlArgsArray();
+            for (let e of extra) argv.push(e);
+            for (let a of argsArray) argv.push(a);
+
+            let proc = new Gio.Subprocess({
+                argv: argv,
+                flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
+            });
+
+            proc.init(null);
+            proc.communicate_utf8_async(null, null, (procObj, res) => {
+                try {
+                    let [ok, stdout, stderr] = procObj.communicate_utf8_finish(res);
+                    callback(ok && stdout ? stdout.toString().trim() : "");
+                } catch (e) {
+                    callback("");
+                }
+            });
+        } catch (e) {
+            callback("");
+        }
     },
 
-    _fetchPerPlayerMetadata: function(tag) {
-        const regex = /%\[([\w-]+)\]\s+([^%]+)%/g;
-        return tag.replace(regex, (match, player, meta) => {
-            let [success, out] = GLib.spawn_command_line_sync(`playerctl --player=${player} metadata ${meta}`);
-            return (success && out) ? out.toString().trim() : "";
+    _fetchPerPlayerMetadataAsync: function(formatStr, callback) {
+        const regex = /%\[([\w\-\.:]+)\]\s+([^%]+)%/g;
+        let matches = [];
+        let m;
+        while ((m = regex.exec(formatStr)) !== null) {
+            matches.push({ full: m[0], player: m[1], meta: m[2] });
+        }
+        if (!matches.length) { callback(formatStr); return; }
+
+        let pending = matches.length;
+        let result = formatStr;
+
+        matches.forEach((match) => {
+            try {
+                const argv = ['playerctl', `--player=${match.player}`, 'metadata', match.meta];
+                let proc = new Gio.Subprocess({
+                    argv: argv,
+                    flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
+                });
+                proc.init(null);
+                proc.communicate_utf8_async(null, null, (p, res) => {
+                    try {
+                        let [ok, stdout, stderr] = p.communicate_utf8_finish(res);
+                        let val = ok && stdout ? stdout.toString().trim() : "";
+                        result = result.replace(match.full, val);
+                    } catch (e) {
+                        result = result.replace(match.full, "");
+                    } finally {
+                        pending--;
+                        if (pending === 0) callback(result);
+                    }
+                });
+            } catch (e) {
+                result = result.replace(match.full, "");
+                pending--;
+                if (pending === 0) callback(result);
+            }
         });
     },
 
-    _replaceDynamicTags: function(str, title, artist, album) {
-        str = str.replace(/%title%/g, title).replace(/%artist%/g, artist).replace(/%album%/g, album);
-        return this._fetchPerPlayerMetadata(str);
+    _replaceDynamicTagsAndUpdateLabels: function(title, artist, album) {
+        const base1 = this.line1Format.replace(/%title%/g, title).replace(/%artist%/g, artist).replace(/%album%/g, album);
+        const base2 = this.line2Format.replace(/%title%/g, title).replace(/%artist%/g, artist).replace(/%album%/g, album);
+
+        this._fetchPerPlayerMetadataAsync(base1, (final1) => {
+            if (final1 !== this._lastLine1) {
+                this.labelTitle.set_text(final1);
+                this._lastLine1 = final1;
+            }
+        });
+        this._fetchPerPlayerMetadataAsync(base2, (final2) => {
+            if (final2 !== this._lastLine2) {
+                this.labelArtist.set_text(final2);
+                this._lastLine2 = final2;
+            }
+        });
     },
 
     _updateAll: function() {
         this._updateFont();
-        this._updateStatus();
-        this.spacingWidget.width = this.buttonTextSpacing;
+        this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
     },
 
     _updateFont: function() {
@@ -157,64 +248,76 @@ MyDesklet.prototype = {
     },
 
     _updateStatus: function() {
-        let [successStatus, outStatus] = this._runPlayerctl("status");
-        let status = (successStatus && outStatus) ? outStatus.toString().trim() : null;
+        try {
+            this._runPlayerctlAsync(['status'], (statusOut) => {
+                const status = statusOut ? statusOut.trim() : "";
+                const idle = !status || status === "Stopped";
 
-        let showButtons = true;
+                // Switch polling interval depending on status
+                this._startPolling(idle);
 
-        if (!status) {
-            this.labelTitle.set_text("No player running");
-            this.labelArtist.set_text("");
-            showButtons = false;
-        } else if (status === "Stopped") {
-            this.labelTitle.set_text("Player is stopped");
-            this.labelArtist.set_text("");
-            showButtons = false;
+                let showButtons = !idle;
+
+                if (idle) {
+                    if (this._lastLine1 !== "No player running") {
+                        this.labelTitle.set_text("No player running");
+                        this._lastLine1 = "No player running";
+                    }
+                    if (this._lastLine2 !== "") {
+                        this.labelArtist.set_text("");
+                        this._lastLine2 = "";
+                    }
+                }
+
+                if (!showButtons || this.hideAllButtons) {
+                    this.buttonVBox.hide();
+                    this.spacingWidget.hide();
+                } else {
+                    this.buttonVBox.show();
+                    this.spacingWidget.show();
+                    this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
+                    if (this.hideSkipButtons) this.skipHBox.hide(); else this.skipHBox.show();
+                }
+
+                if (!idle) {
+                    this._runPlayerctlAsync(['metadata', 'xesam:title'], (outTitle) => {
+                        const title = outTitle || "Unknown Title";
+                        this._runPlayerctlAsync(['metadata', 'xesam:artist'], (outArtist) => {
+                            const artist = outArtist || "Unknown Artist";
+                            this._runPlayerctlAsync(['metadata', 'xesam:album'], (outAlbum) => {
+                                const album = outAlbum || "Unknown Album";
+                                this._replaceDynamicTagsAndUpdateLabels(title, artist, album);
+                                this._updateButtonTextures(status === "Playing");
+                            });
+                        });
+                    });
+                } else {
+                    this._updateButtonTextures(false);
+                }
+            });
+        } catch (e) {
+            global.logError(`[music-display@nicholasjdi] _updateStatus exception: ${e}`);
         }
-
-        if (!showButtons || this.hideAllButtons) {
-            this.buttonVBox.hide();
-            this.spacingWidget.hide();
-        } else {
-            this.buttonVBox.show();
-            this.spacingWidget.show();
-            if (this.hideSkipButtons) this.skipHBox.hide(); else this.skipHBox.show();
-        }
-
-        if (!status || status === "Stopped") return true;
-
-        let [successTitle, outTitle] = this._runPlayerctl("metadata xesam:title");
-        let title = (successTitle && outTitle) ? outTitle.toString().trim() : "Unknown Title";
-
-        let [successArtist, outArtist] = this._runPlayerctl("metadata xesam:artist");
-        let artist = (successArtist && outArtist) ? outArtist.toString().trim() : "Unknown Artist";
-
-        let [successAlbum, outAlbum] = this._runPlayerctl("metadata xesam:album");
-        let album = (successAlbum && outAlbum) ? outAlbum.toString().trim() : "Unknown Album";
-
-        this.labelTitle.set_text(this._replaceDynamicTags(this.line1Format, title, artist, album));
-        this.labelArtist.set_text(this._replaceDynamicTags(this.line2Format, title, artist, album));
-
-        let isPlaying = (status === "Playing");
-        this._updateButtonTextures(isPlaying);
-
         return true;
     },
 
     _updateButtonTextures: function(isPlaying) {
         const basePath = this.metadata.path + "/textures/";
-        const playTexture = (this.btnPlayTexture && this.btnPlayTexture !== "") ? this.btnPlayTexture : basePath + "play.png";
-        const pauseTexture = (this.btnPauseTexture && this.btnPauseTexture !== "") ? this.btnPauseTexture : basePath + "pause.png";
-        const prevTexture = (this.btnPrevTexture && this.btnPrevTexture !== "") ? this.btnPrevTexture : basePath + "previous.png";
-        const nextTexture = (this.btnNextTexture && this.btnNextTexture !== "") ? this.btnNextTexture : basePath + "next.png";
+        const playTexture = this.btnPlayTexture || basePath + "play.png";
+        const pauseTexture = this.btnPauseTexture || basePath + "pause.png";
+        const prevTexture = this.btnPrevTexture || basePath + "previous.png";
+        const nextTexture = this.btnNextTexture || basePath + "next.png";
 
         let playPauseFile = isPlaying ? pauseTexture : playTexture;
 
-        this.btnPlayPause.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(playPauseFile), icon_size: this.buttonSize }));
-        this.btnPlayPause.height = this.buttonSize;
+        if (playPauseFile !== this._lastPlayPauseFile) {
+            this.btnPlayPause.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(playPauseFile), icon_size: this.buttonSize }));
+            this.btnPlayPause.height = this.buttonSize;
+            this._lastPlayPauseFile = playPauseFile;
+        }
 
         if (!this.hideSkipButtons && !this.hideAllButtons) {
-            let skipSize = Math.floor(this.buttonSize / 2);
+            const skipSize = Math.floor(this.buttonSize / 2);
             this.btnPrev.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(prevTexture), icon_size: skipSize }));
             this.btnPrev.height = skipSize;
             this.btnNext.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(nextTexture), icon_size: skipSize }));
@@ -223,18 +326,15 @@ MyDesklet.prototype = {
     },
 
     _onPlayPausePressed: function() {
-        GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgs()} play-pause`);
-        this._updateAll();
+        GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} play-pause`);
     },
 
     _onPrevPressed: function() {
-        GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgs()} previous`);
-        this._updateAll();
+        GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} previous`);
     },
 
     _onNextPressed: function() {
-        GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgs()} next`);
-        this._updateAll();
+        GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} next`);
     },
 
     on_desklet_removed: function() {
