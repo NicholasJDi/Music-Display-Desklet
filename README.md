@@ -17,26 +17,27 @@ For both lines you can change: format, font, and font size.
 
 ### Format
 #### %title%
-The Title of the Song.
+The Title of the Track.
 #### %artist%
-The Artitst who made the Song
+The Artitst who made the Track.
 #### %album%
-The Album the Song is from.
+The Album the Track is from.
 #### %player%
-The Player the Song is being played from. (rhytmbox,vlc,spotify)
+The Player the Track is being played from. (rhytmbox,vlc,spotify)
 #### %[player] metadata:key%
 The Most unique of the format tags, it allows you to define raw metadata to grab based on the Player.
 ##### [player]
-The Player the Song must be played from for this format tag to activate, the same as %player%.
+The Player the Track must be played from for this format tag to activate, the same as %player%.
 ##### metadata:key
-The metadata key to grab from. (xesam:trackNumber)
+The Metadata key to grab from. (xesam:trackNumber)<br>
+Run: `playerctl metadata` to show Metadata for the current Track
 #### Example
 Using all of these tags we can set line 1 to "%title%" and set line 2 to "by %artist% from %album% track #%[rhythmbox] xesam:discNumber%%[spotify] xesam:discNumber%-%[rhythmbox] xesam:trackNumber%%[vlc] xesam:tracknumber%%[spotify] xesam:trackNumber%" (vlc doesn't support disc number) to show:<br>
 <img width="406" height="72" alt="Screenshot from 2025-09-08 09-18-34" src="https://github.com/user-attachments/assets/4d7c122e-f064-4c3c-9eb1-93e66f5b5087" /><br>
 for Rhythmbox, VLC and Spotify. (i'm using rhythmbox in these examples) and people probably won't be using vlc, i probably will remove it from my Whitelist. oh and about Whitelist,
 ### Player Settings
-#### Song Polling Interval
-The Interval for how often Song data is updated.
+#### Track Polling Interval
+The Interval for how often Track data is updated.
 #### Player Polling Interval
 The Interval for how often Players are checked for.
 #### Allowed Players
