@@ -25,8 +25,8 @@ MyDesklet.prototype = {
         this.line2Format = "%artist%";
         this.line1Font = "";
         this.line2Font = "";
-        this.line1Size = 20;
-        this.line2Size = 17;
+        this.line1Size = 25;
+        this.line2Size = 18;
 
         this.line1_no_player = "No player running";
         this.line2_no_player = "";
@@ -38,7 +38,7 @@ MyDesklet.prototype = {
         this.buttonTextSpacing = 7;
         this.buttonSize = 32;
 
-        this.playerWhitelist = "rhythmbox,vlc";
+        this.playerWhitelist = "rhythmbox,vlc,spotify";
         this.treatWhitelistAsBlacklist = false;
         this.pollInterval = DEFAULT_POLL_INTERVAL;
         this.idlePollInterval = DEFAULT_IDLE_POLL_INTERVAL;
