@@ -5,7 +5,7 @@ const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 const Settings = imports.ui.settings;
 
-const DEFAULT_POLL_INTERVAL = 1; // seconds
+const DEFAULT_POLL_INTERVAL = 1;
 
 function MyDesklet(metadata, instance_id) {
     this._init(metadata, instance_id);
@@ -17,10 +17,9 @@ MyDesklet.prototype = {
     _init: function(metadata, instance_id) {
         Desklet.Desklet.prototype._init.call(this, metadata, instance_id);
         this.metadata = metadata;
-
         const basePath = this.metadata.path + "/textures/";
 
-        // Default values
+        // Defaults
         this.line1Format = "%title%";
         this.line2Format = "%artist%";
         this.line1Font = "";
@@ -31,6 +30,7 @@ MyDesklet.prototype = {
         this.hideAllButtons = false;
         this.buttonTextSpacing = 7;
         this.buttonSize = 32;
+
         this.playerWhitelist = "rhythmbox,vlc";
         this.treatWhitelistAsBlacklist = false;
         this.pollInterval = DEFAULT_POLL_INTERVAL;
@@ -43,38 +43,13 @@ MyDesklet.prototype = {
         // Settings
         this.settings = new Settings.DeskletSettings(this, this.metadata.uuid, instance_id);
 
-        // Line1
-        this.settings.bind("line1_format", "line1Format", Lang.bind(this, this._updateAll));
-        this.settings.bind("line1_font", "line1Font", Lang.bind(this, this._updateAll));
-        this.settings.bind("line1_size", "line1Size", Lang.bind(this, this._updateAll));
-
-        // Line2
-        this.settings.bind("line2_format", "line2Format", Lang.bind(this, this._updateAll));
-        this.settings.bind("line2_font", "line2Font", Lang.bind(this, this._updateAll));
-        this.settings.bind("line2_size", "line2Size", Lang.bind(this, this._updateAll));
-
-        // Buttons
-        this.settings.bind("btn_play_texture", "btnPlayTexture", Lang.bind(this, this._updateAll));
-        this.settings.bind("btn_pause_texture", "btnPauseTexture", Lang.bind(this, this._updateAll));
-        this.settings.bind("btn_next_texture", "btnNextTexture", Lang.bind(this, this._updateAll));
-        this.settings.bind("btn_prev_texture", "btnPrevTexture", Lang.bind(this, this._updateAll));
-        this.settings.bind("hide_skip_buttons", "hideSkipButtons", Lang.bind(this, this._updateAll));
-        this.settings.bind("hide_all_buttons", "hideAllButtons", Lang.bind(this, this._updateAll));
-        this.settings.bind("button_text_spacing", "buttonTextSpacing", Lang.bind(this, this._updateAll));
-        this.settings.bind("button_size", "buttonSize", Lang.bind(this, this._updateAll));
-
-        // Player filter settings
-        this.settings.bind("player_whitelist", "playerWhitelist", Lang.bind(this, this._updateAll));
-        this.settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", Lang.bind(this, this._updateAll));
-
-        // Poll interval setting
-        this.settings.bind("poll_interval", "pollInterval", Lang.bind(this, this._resetPolling));
+        // Bind settings
+        this._bindSettings();
 
         // Layout
         this.mainBox = new St.BoxLayout({ vertical: false });
         this.setContent(this.mainBox);
 
-        // Buttons VBox
         this.buttonVBox = new St.BoxLayout({ vertical: true });
         this.mainBox.add_child(this.buttonVBox);
 
@@ -93,11 +68,10 @@ MyDesklet.prototype = {
         this.btnNext.connect('button-press-event', Lang.bind(this, this._onNextPressed));
         this.skipHBox.add_child(this.btnNext);
 
-        // Dummy spacing widget between buttons and text
-        this.spacingWidget = new St.Widget();
+        // Dummy spacing widget
+        this.spacingWidget = new St.Widget({ style_class: "spacing-widget", width: this.buttonTextSpacing });
         this.mainBox.add_child(this.spacingWidget);
 
-        // Text VBox
         this.textVBox = new St.BoxLayout({ vertical: true });
         this.mainBox.add_child(this.textVBox);
 
@@ -107,23 +81,41 @@ MyDesklet.prototype = {
         this.labelArtist = new St.Label({ text: "" });
         this.textVBox.add_child(this.labelArtist);
 
-        // Update button sizes when textVBox allocation changes
         this.textVBox.connect('notify::allocation', Lang.bind(this, this._updateAll));
 
-        // Initial UI update
         this._updateAll();
-
-        // Polling for player updates
         this._startPolling();
+    },
+
+    _bindSettings: function() {
+        const settings = this.settings;
+        const bind = Lang.bind;
+
+        settings.bind("line1_format", "line1Format", bind(this, this._updateAll));
+        settings.bind("line1_font", "line1Font", bind(this, this._updateAll));
+        settings.bind("line1_size", "line1Size", bind(this, this._updateAll));
+        settings.bind("line2_format", "line2Format", bind(this, this._updateAll));
+        settings.bind("line2_font", "line2Font", bind(this, this._updateAll));
+        settings.bind("line2_size", "line2Size", bind(this, this._updateAll));
+
+        settings.bind("btn_play_texture", "btnPlayTexture", bind(this, this._updateAll));
+        settings.bind("btn_pause_texture", "btnPauseTexture", bind(this, this._updateAll));
+        settings.bind("btn_next_texture", "btnNextTexture", bind(this, this._updateAll));
+        settings.bind("btn_prev_texture", "btnPrevTexture", bind(this, this._updateAll));
+        settings.bind("hide_skip_buttons", "hideSkipButtons", bind(this, this._updateAll));
+        settings.bind("hide_all_buttons", "hideAllButtons", bind(this, this._updateAll));
+        settings.bind("button_text_spacing", "buttonTextSpacing", bind(this, this._updateAll));
+        settings.bind("button_size", "buttonSize", bind(this, this._updateAll));
+
+        settings.bind("player_whitelist", "playerWhitelist", bind(this, this._updateAll));
+        settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", bind(this, this._updateAll));
+
+        settings.bind("poll_interval", "pollInterval", bind(this, this._resetPolling));
     },
 
     _startPolling: function() {
         if (this._pollId) GLib.source_remove(this._pollId);
-        this._pollId = GLib.timeout_add_seconds(
-            GLib.PRIORITY_DEFAULT,
-            this.pollInterval,
-            Lang.bind(this, this._updateStatus)
-        );
+        this._pollId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, this.pollInterval, Lang.bind(this, this._updateStatus));
     },
 
     _resetPolling: function() {
@@ -132,49 +124,36 @@ MyDesklet.prototype = {
 
     _getPlayerctlArgs: function() {
         if (!this.playerWhitelist.trim()) return "";
-        const players = this.playerWhitelist
-            .split(",")
-            .map(p => p.trim())
-            .filter(p => p.length > 0)
-            .join(",");
-        return this.treatWhitelistAsBlacklist
-            ? `--ignore-player=${players}`
-            : `--player=${players}`;
+        const players = this.playerWhitelist.split(",").map(p => p.trim()).filter(p => p.length > 0).join(",");
+        return this.treatWhitelistAsBlacklist ? `--ignore-player=${players}` : `--player=${players}`;
     },
 
     _runPlayerctl: function(args) {
         return GLib.spawn_command_line_sync(`playerctl ${this._getPlayerctlArgs()} ${args}`);
     },
 
+    _fetchPerPlayerMetadata: function(tag) {
+        const regex = /%\[([\w-]+)\]\s+([^%]+)%/g;
+        return tag.replace(regex, (match, player, meta) => {
+            let [success, out] = GLib.spawn_command_line_sync(`playerctl --player=${player} metadata ${meta}`);
+            return (success && out) ? out.toString().trim() : "";
+        });
+    },
+
+    _replaceDynamicTags: function(str, title, artist, album) {
+        str = str.replace(/%title%/g, title).replace(/%artist%/g, artist).replace(/%album%/g, album);
+        return this._fetchPerPlayerMetadata(str);
+    },
+
     _updateAll: function() {
-        this._updateText();
         this._updateFont();
-
-        // Update spacing
-        if (this.buttonVBox.visible) {
-            this.spacingWidget.width = this.buttonTextSpacing;
-            this.spacingWidget.height = 1;
-            this.spacingWidget.show();
-        } else {
-            this.spacingWidget.hide();
-        }
-
-        // Update button sizes and textures
-        let isPlaying = false;
-        let [successStatus, outStatus] = this._runPlayerctl("status");
-        let status = (successStatus && outStatus) ? outStatus.toString().trim() : null;
-        if (status === "Playing") isPlaying = true;
-
-        this._updateButtonTextures(isPlaying);
+        this._updateStatus();
+        this.spacingWidget.width = this.buttonTextSpacing;
     },
 
     _updateFont: function() {
         this.labelTitle.style = `${this.line1Font ? "font-family:" + this.line1Font + ";" : ""} font-size: ${this.line1Size}px;`;
         this.labelArtist.style = `${this.line2Font ? "font-family:" + this.line2Font + ";" : ""} font-size: ${this.line2Size}px;`;
-    },
-
-    _updateText: function() {
-        this._updateStatus();
     },
 
     _updateStatus: function() {
@@ -193,18 +172,17 @@ MyDesklet.prototype = {
             showButtons = false;
         }
 
-        // Update button visibility
         if (!showButtons || this.hideAllButtons) {
             this.buttonVBox.hide();
             this.spacingWidget.hide();
         } else {
             this.buttonVBox.show();
+            this.spacingWidget.show();
             if (this.hideSkipButtons) this.skipHBox.hide(); else this.skipHBox.show();
         }
 
         if (!status || status === "Stopped") return true;
 
-        // Update metadata
         let [successTitle, outTitle] = this._runPlayerctl("metadata xesam:title");
         let title = (successTitle && outTitle) ? outTitle.toString().trim() : "Unknown Title";
 
@@ -214,16 +192,8 @@ MyDesklet.prototype = {
         let [successAlbum, outAlbum] = this._runPlayerctl("metadata xesam:album");
         let album = (successAlbum && outAlbum) ? outAlbum.toString().trim() : "Unknown Album";
 
-        this.labelTitle.set_text(
-            this.line1Format.replace("%title%", title)
-                            .replace("%artist%", artist)
-                            .replace("%album%", album)
-        );
-        this.labelArtist.set_text(
-            this.line2Format.replace("%title%", title)
-                            .replace("%artist%", artist)
-                            .replace("%album%", album)
-        );
+        this.labelTitle.set_text(this._replaceDynamicTags(this.line1Format, title, artist, album));
+        this.labelArtist.set_text(this._replaceDynamicTags(this.line2Format, title, artist, album));
 
         let isPlaying = (status === "Playing");
         this._updateButtonTextures(isPlaying);
@@ -233,33 +203,21 @@ MyDesklet.prototype = {
 
     _updateButtonTextures: function(isPlaying) {
         const basePath = this.metadata.path + "/textures/";
-        const playPauseSize = this.buttonSize;
-        const skipSize = Math.floor(playPauseSize / 2);
-
-        const playTexture = this.btnPlayTexture && this.btnPlayTexture !== "" ? this.btnPlayTexture : basePath + "play.png";
-        const pauseTexture = this.btnPauseTexture && this.btnPauseTexture !== "" ? this.btnPauseTexture : basePath + "pause.png";
-        const prevTexture = this.btnPrevTexture && this.btnPrevTexture !== "" ? this.btnPrevTexture : basePath + "previous.png";
-        const nextTexture = this.btnNextTexture && this.btnNextTexture !== "" ? this.btnNextTexture : basePath + "next.png";
+        const playTexture = (this.btnPlayTexture && this.btnPlayTexture !== "") ? this.btnPlayTexture : basePath + "play.png";
+        const pauseTexture = (this.btnPauseTexture && this.btnPauseTexture !== "") ? this.btnPauseTexture : basePath + "pause.png";
+        const prevTexture = (this.btnPrevTexture && this.btnPrevTexture !== "") ? this.btnPrevTexture : basePath + "previous.png";
+        const nextTexture = (this.btnNextTexture && this.btnNextTexture !== "") ? this.btnNextTexture : basePath + "next.png";
 
         let playPauseFile = isPlaying ? pauseTexture : playTexture;
 
-        this.btnPlayPause.set_child(new St.Icon({
-            gicon: Gio.icon_new_for_string(playPauseFile),
-            icon_size: playPauseSize
-        }));
-        this.btnPlayPause.height = playPauseSize;
+        this.btnPlayPause.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(playPauseFile), icon_size: this.buttonSize }));
+        this.btnPlayPause.height = this.buttonSize;
 
         if (!this.hideSkipButtons && !this.hideAllButtons) {
-            this.btnPrev.set_child(new St.Icon({
-                gicon: Gio.icon_new_for_string(prevTexture),
-                icon_size: skipSize
-            }));
+            let skipSize = Math.floor(this.buttonSize / 2);
+            this.btnPrev.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(prevTexture), icon_size: skipSize }));
             this.btnPrev.height = skipSize;
-
-            this.btnNext.set_child(new St.Icon({
-                gicon: Gio.icon_new_for_string(nextTexture),
-                icon_size: skipSize
-            }));
+            this.btnNext.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(nextTexture), icon_size: skipSize }));
             this.btnNext.height = skipSize;
         }
     },
