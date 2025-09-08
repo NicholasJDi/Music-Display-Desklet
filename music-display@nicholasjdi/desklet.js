@@ -38,10 +38,11 @@ MusicDisplayDesklet.prototype = {
         this.buttonTextSpacing = 7;
         this.buttonSize = 32;
 
-        this.playerWhitelist = "rhythmbox,vlc,spotify";
+        this.playerWhitelist = "rhythmbox,spotify";
         this.treatWhitelistAsBlacklist = false;
         this.pollInterval = DEFAULT_POLL_INTERVAL;
         this.idlePollInterval = DEFAULT_IDLE_POLL_INTERVAL;
+        this.debugMode = false;
 
         this.btnPlayTexture = basePath + "play.png";
         this.btnPauseTexture = basePath + "pause.png";
@@ -50,6 +51,7 @@ MusicDisplayDesklet.prototype = {
 
         // Track last displayed info
         this._lastStatus = null;
+		this._lastMetadataStatus = null;
         this._lastLine1 = null;
         this._lastLine2 = null;
         this._lastPlayPauseFile = null;
@@ -143,6 +145,7 @@ MusicDisplayDesklet.prototype = {
         settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", bind(this, this._updateAll));
         settings.bind("poll_interval", "pollInterval", bind(this, this._resetPolling));
         settings.bind("idle_poll_interval", "idlePollInterval", bind(this, this._resetPolling));
+        settings.bind("debug_mode", "debugMode", bind(this, this._updateAll));
     },
 
     _startPolling: function() {
@@ -155,7 +158,9 @@ MusicDisplayDesklet.prototype = {
             let ms = Math.max(50, Math.round(interval * 1000));
             this._pollId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, Lang.bind(this, this._updateStatus));
         }
+        if (this.debugMode) {
         global.log(`[music-display@nicholasjdi] Polling every ${interval}s`);
+        }
     },
 
     _resetPolling: function() {
@@ -230,6 +235,9 @@ MusicDisplayDesklet.prototype = {
     },
 
     _replaceDynamicTagsAndUpdateLabels: function(title, artist, album, playerName) {
+        if (this.debugMode) {
+        global.log(`[music-display@nicholasjdi] Resetting text ` + title + ` ` + artist + ` ` + album + ` ` + playerName);
+        }
         let base1 = this.line1Format.replace(/%title%/g, title).replace(/%artist%/g, artist).replace(/%album%/g, album);
         let base2 = this.line2Format.replace(/%title%/g, title).replace(/%artist%/g, artist).replace(/%album%/g, album);
         if (playerName) {
@@ -260,6 +268,9 @@ MusicDisplayDesklet.prototype = {
     _updateFont: function() {
         this.labelTitle.style = `${this.line1Font ? "font-family:" + this.line1Font + ";" : ""} font-size: ${this.line1Size}px;`;
         this.labelArtist.style = `${this.line2Font ? "font-family:" + this.line2Font + ";" : ""} font-size: ${this.line2Size}px;`;
+		if (this.debugMode) {
+		global.log(`[music-display@nicholasjdi] Update font`);
+		}
     },
 
     _updateStatus: function() {
@@ -307,28 +318,50 @@ MusicDisplayDesklet.prototype = {
                     showButtons = false;
                 } else {
                     // Playing or Paused
-                    this._runPlayerctlAsync(['-l'], playersOut => {
-                        let firstPlayer = playersOut.split("\n").find(p => {
-                            if (!p) return false;
-                            if (!this.playerWhitelist || !this.playerWhitelist.trim()) return true;
-                            const players = this.playerWhitelist.split(",").map(x => x.trim());
-                            return this.treatWhitelistAsBlacklist ? !players.includes(p) : players.includes(p);
-                        }) || "Player";
+					this._runPlayerctlAsync(['metadata', 'mpris:trackid'], outTrackId => {
+					    const trackId = outTrackId || "";
+					
+					    // If the track hasn't changed AND the status is the same → skip all metadata fetches
+					    if (trackId === this._lastTrackId && status === this._lastMetadataStatus) {
+					        if (this.debugMode) {
+					            global.log(`[music-display@nicholasjdi] Track unchanged, skipping metadata fetch and text updating`);
+					        }
+					        return;
+					    }
+					
+					    // Update stored track ID
+						this._lastMetadataStatus = status
+					    this._lastTrackId = trackId;
+					
+					    // Now fetch the first player only if we need metadata
+					    this._runPlayerctlAsync(['-l'], playersOut => {
+					        let firstPlayer = playersOut.split("\n").find(p => {
+					            if (!p) return false;
+					            if (!this.playerWhitelist || !this.playerWhitelist.trim()) return true;
+					            const players = this.playerWhitelist.split(",").map(x => x.trim());
+					            return this.treatWhitelistAsBlacklist ? !players.includes(p) : players.includes(p);
+					        }) || "Player";
+					
+					        // Fetch title, artist, album metadata
+					        this._runPlayerctlAsync(['metadata', 'xesam:title'], outTitle => {
+					            const title = outTitle || "Unknown Title";
+					            this._runPlayerctlAsync(['metadata', 'xesam:artist'], outArtist => {
+					                const artist = outArtist || "Unknown Artist";
+					                this._runPlayerctlAsync(['metadata', 'xesam:album'], outAlbum => {
+					                    const album = outAlbum || "Unknown Album";
+					
+					                    // Update labels
+					                    this._replaceDynamicTagsAndUpdateLabels(title, artist, album, firstPlayer);
+					
+					                    // Update buttons too
+					                    const isPlaying = (status === "Playing");
+					                    this._updateButtonTextures(isPlaying);
+					                });
+					            });
+					        });
+					    });
+					});
 
-                        this._runPlayerctlAsync(['metadata', 'xesam:title'], outTitle => {
-                            const title = outTitle || "Unknown Title";
-                            this._runPlayerctlAsync(['metadata', 'xesam:artist'], outArtist => {
-                                const artist = outArtist || "Unknown Artist";
-                                this._runPlayerctlAsync(['metadata', 'xesam:album'], outAlbum => {
-                                    const album = outAlbum || "Unknown Album";
-                                    this._replaceDynamicTagsAndUpdateLabels(title, artist, album, firstPlayer);
-
-                                    const isPlaying = (status === "Playing");
-                                    this._updateButtonTextures(isPlaying);
-                                });
-                            });
-                        });
-                    });
                     showButtons = true;
                 }
 
@@ -352,6 +385,9 @@ MusicDisplayDesklet.prototype = {
     },
 
     _updateButtonTextures: function(isPlaying) {
+		if (this.debugMode) {
+		global.log(`[music-display@nicholasjdi] Update buttons`);
+		}
         const basePath = this.metadata.path + "/textures/";
         const playTexture = this.btnPlayTexture || basePath + "play.png";
         const pauseTexture = this.btnPauseTexture || basePath + "pause.png";

@@ -145,13 +145,19 @@
     "player_whitelist": {
         "type": "entry",
         "description": "Player whitelist",
-        "default": "rhythmbox,vlc,spotify",
+        "default": "rhythmbox,spotify",
         "tooltip":"Comma-separated list of allowed players"
     },
     "treat_whitelist_as_blacklist": {
         "type": "checkbox",
         "description": "Treat whitelist as blacklist instead",
         "default": false
+    },
+    "debug_mode": {
+    "type": "checkbox",
+        "description": "Debug Mode",
+        "default": false,
+        "tooltip":"Log debug outputs in cinnamon log"
     }
 }
 
