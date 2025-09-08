@@ -7,7 +7,7 @@
         "type": "entry",
         "description": "Format",
         "default": "%title%",
-        "tooltip": "Use %title%, %artist%, %album% for dynamic display"
+        "tooltip": "Use %title%, %artist%, %album%, %player%, %[player] metadata:key% for dynamic display"
     },
     "line1_font": {
         "type": "entry",
@@ -17,12 +17,23 @@
     "line1_size": {
         "type": "scale",
         "description": "Font size",
-        "default": 20,
+        "default": 25,
         "min": 6,
         "max": 72,
         "step": 1
     },
-
+    "line1_no_player": {
+    "type": "entry",
+    "description": "Line 1 text when no player is running",
+    "default": "No player running"
+    },
+	"line1_stopped": {
+	    "type": "entry",
+	    "description": "Line 1 text when player is stopped",
+	    "default": "Player %player% is stopped",
+        "tooltip": "Use %player% to get running player id"
+	},
+	
     "head2": {
         "type": "header",
         "description": "Line 2 Settings"
@@ -31,7 +42,7 @@
         "type": "entry",
         "description": "Format",
         "default": "%artist%",
-        "tooltip": "Use %title%, %artist%, %album% for dynamic display"
+        "tooltip": "Use %title%, %artist%, %album%, %player%, %[player] metadata:key% for dynamic display"
     },
     "line2_font": {
         "type": "entry",
@@ -41,11 +52,22 @@
     "line2_size": {
         "type": "scale",
         "description": "Font size",
-        "default": 17,
+        "default": 18,
         "min": 6,
         "max": 72,
         "step": 1
     },
+	"line2_no_player": {
+	    "type": "entry",
+	    "description": "Line 2 text when no player is running",
+	    "default": ""
+	},
+	"line2_stopped": {
+	    "type": "entry",
+	    "description": "Line 2 text when player is stopped",
+	    "default": "",
+        "tooltip": "Use %player% to get running player id"
+	},
 
     "head3": {
         "type": "header",
@@ -123,7 +145,7 @@
     "player_whitelist": {
         "type": "entry",
         "description": "Comma-separated list of allowed players",
-        "default": "rhythmbox,vlc"
+        "default": "rhythmbox,vlc,spotify"
     },
     "treat_whitelist_as_blacklist": {
         "type": "checkbox",
