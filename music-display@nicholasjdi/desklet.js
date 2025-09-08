@@ -106,6 +106,10 @@ MyDesklet.prototype = {
         this._startPolling();
     },
 
+    _checkPlayerctlInstalled: function() {
+    return !!GLib.find_program_in_path("playerctl");
+    },
+
     _bindSettings: function() {
         const settings = this.settings;
         const bind = Lang.bind;
@@ -250,6 +254,7 @@ MyDesklet.prototype = {
     _updateAll: function() {
         this._updateFont();
         this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
+        this._updateStatus();
     },
 
     _updateFont: function() {
@@ -259,6 +264,21 @@ MyDesklet.prototype = {
 
     _updateStatus: function() {
         try {
+            if (!this._checkPlayerctlInstalled()) {
+            this.labelTitle.set_text("playerctl is not installed");
+            this.labelArtist.set_text("Use command: sudo apt install playerctl");
+            this.buttonVBox.hide();
+            this.spacingWidget.hide();
+            return true;
+         } else if (this.labelTitle.get_text() === "playerctl is not installed") {
+            // playerctl was just installed — reset labels and force a full refresh
+            this._lastLine1 = null;
+            this._lastLine2 = null;
+            this._lastStatus = null;  // <-- Forces _updateStatus to reload info
+            this.labelTitle.set_text("");
+            this.labelArtist.set_text("");
+          }
+
             this._runPlayerctlAsync(['status'], statusOut => {
                 const status = statusOut ? statusOut.trim() : "";
 
