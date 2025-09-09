@@ -1,7 +1,7 @@
 # Music Display Desklet
 A Linux Mint Cinnamon Desklet for displaying what is currently being played by players supporting the MPRIS D-Bus specification such as Rhythmbox, VLC, Spotify, and more, using the playerctl command-line utility.
 
-Note: The Code is really messy cause i do NOT know Javascript, this is my first time ever using it. (i know even less aout CJS) But it works and i'm happy with it :D
+Note: The Code is really messy cause i do NOT know Javascript, this is my first time ever using it. (i know even less aout CJS) But it works and i'm happy with it :D (also this was made with quite a lot of help from ChatGPT, i did do a lot myself though)
 ## Instillation
 Go to your Desklets folder `~/.local/share/cinnamon/desklets` (or create it if it doesn't exist) and run `git clone https://github.com/NicholasJDi/Music-Display-Desklet` go inside the folder and drag out the `music-display@nicholasjdi` folder into the Desklets folder and delete the Music-Display-Desklet folder, run `sudo apt install playerctl` and you should be good to go! (of course enable the Desklet)
 
