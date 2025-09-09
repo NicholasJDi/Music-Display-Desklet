@@ -1,4 +1,5 @@
 const Desklet = imports.ui.desklet;
+const PopupMenu = imports.ui.popupMenu;
 const St = imports.gi.St;
 const Lang = imports.lang;
 const GLib = imports.gi.GLib;
@@ -114,6 +115,28 @@ MusicDisplayDesklet.prototype = {
         });
         subprocess.init(null);
         }));
+        this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        // Context Menu Play/Pause Track
+        this._menu.addAction(_('Play/Pause Track'), Lang.bind(this, function () {
+        GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} play-pause`);
+        this._updateStatus();
+        }));
+        // Context Menu Next Track
+        this._menu.addAction(_('Next Track'), Lang.bind(this, function () {
+        GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} next`);
+        this._updateStatus();
+        }));
+        // Context Menu Previous Track
+        this._menu.addAction(_('Previous Track'), Lang.bind(this, function () {
+        GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} previous`);
+        this._updateStatus();
+        }));
+        // Context Menu Stop Player
+        this._menu.addAction(_('Stop Player'), Lang.bind(this, function () {
+        GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} stop`);
+        this._updateStatus();
+        }));
+
 
         // Update when sizing changes
         this.textVBox.connect('notify::allocation', Lang.bind(this, this._updateAll));
