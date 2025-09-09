@@ -94,11 +94,18 @@ MusicDisplayDesklet.prototype = {
         this.textVBox = new St.BoxLayout({ vertical: true });
         this.mainBox.add_child(this.textVBox);
 
-        this.labelTitle = new St.Label({ text: "Loading…" });
-        this.textVBox.add_child(this.labelTitle);
+        this.labelTitle = new St.Label({
+	    text: "Loading…",
+	    x_expand: true,
+	});
+	this.textVBox.add_child(this.labelTitle);
+	
+	this.labelArtist = new St.Label({
+	    text: "",
+	    x_expand: true,
+	});
+	this.textVBox.add_child(this.labelArtist);
 
-        this.labelArtist = new St.Label({ text: "" });
-        this.textVBox.add_child(this.labelArtist);
 
         // Update when sizing changes
         this.textVBox.connect('notify::allocation', Lang.bind(this, this._updateAll));
@@ -260,6 +267,7 @@ MusicDisplayDesklet.prototype = {
     },
 
     _updateAll: function() {
+		this._lastMetadataStatus = null;
         this._updateFont();
         this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
         this._updateStatus();
