@@ -96,16 +96,24 @@ MusicDisplayDesklet.prototype = {
 
         this.labelTitle = new St.Label({
 	    text: "Loading…",
-	    x_expand: true,
-	});
-	this.textVBox.add_child(this.labelTitle);
-	
-	this.labelArtist = new St.Label({
-	    text: "",
-	    x_expand: true,
-	});
-	this.textVBox.add_child(this.labelArtist);
+	    x_expand: true
+        });
+        this.textVBox.add_child(this.labelTitle);
 
+        this.labelArtist = new St.Label({
+        text: "",
+        x_expand: true,
+        });
+        this.textVBox.add_child(this.labelArtist);
+
+        // Context Menu Open Rhythmbox 
+        this._menu.addAction(_('Open Rhythmbox'), Lang.bind(this, function () {
+        let subprocess = new Gio.Subprocess({
+            argv: ['rhythmbox'],
+            flags: Gio.SubprocessFlags.NONE,
+        });
+        subprocess.init(null);
+        }));
 
         // Update when sizing changes
         this.textVBox.connect('notify::allocation', Lang.bind(this, this._updateAll));
