@@ -1,7 +1,7 @@
 # Music Display Desklet
 A Linux Mint Cinnamon Desklet for displaying what is currently being played by players supporting the MPRIS D-Bus specification such as Rhythmbox, VLC, Spotify, and more, using the playerctl command-line utility.
 
-Note: The Code is really messy cause i do NOT know Javascript, this is my first time ever using it. (i know even less aout CJS) But it works and i'm happy with it :D (also this was made with quite a lot of help from ChatGPT, i did do a lot myself though) i will probably be reworking how %[player] metadata:key% works at some point but i need to take a break from coding ;-;
+Note: The Code is really messy cause i do NOT know Javascript, this is my first time ever using it. (i know even less about CJS) But it works and i'm happy with it :D (also this was made with quite a lot of help from ChatGPT, i did do a lot myself though) i will probably be reworking how %[player] metadata:key% works at some point but i need to take a break from coding ;-; (i might actually rework everything myself)
 ## Instillation
 Go to your Desklets folder `~/.local/share/cinnamon/desklets` (or create it if it doesn't exist) and run `git clone https://github.com/NicholasJDi/Music-Display-Desklet` go inside the folder and drag out the `music-display@nicholasjdi` folder into the Desklets folder and delete the Music-Display-Desklet folder, run `sudo apt install playerctl` and you should be good to go! (of course enable the Desklet)
 
@@ -21,14 +21,14 @@ For both lines you can change: format, font, and font size.
 #### %title%
 The Title of the Track.
 #### %artist%
-The Artitst who made the Track.
+The Artist who made the Track.
 #### %album%
 The Album the Track is from.
 #### %player%
 The Player the Track is being played from. (rhytmbox,vlc,spotify)
 #### %[player] metadata:key%
 The Most unique of the format tags, it allows you to define raw metadata to grab based on the Player.<br>
-Note: Having lots of these may heavly impact performance
+Note: Having lots of these may heavily impact performance
 ##### [player]
 The Player the Track must be played from for this format tag to activate, the same as %player%.
 ##### metadata:key
@@ -40,11 +40,11 @@ Using all of these tags we can set line 1 to "%title%" and set line 2 to "by %ar
 for Rhythmbox, VLC and Spotify. (i'm using rhythmbox in these examples) vlc has really bad Metadata support.
 ### Player Settings
 #### Track Polling Interval
-The Interval for how often Track data is updated.
+The Interval for how often Track data is updated. (Playing/Paused)
 #### Player Polling Interval
-The Interval for how often Players are checked for.
+The Interval for how often Players are checked for. (No Player/Stopped)
 #### Allowed Players
-A Comma-separated list of allowed Players.
+A Comma-separated list of allowed Players. (rhythmbox,spotify)
 #### Treat Whitelist As Blacklist
 Whether or not to treat the Whitelist as a Blacklist
 ### Button Settings
@@ -60,7 +60,7 @@ Hide the Previous/Next Buttons, without setting Button Size it will look like th
 The size of the Buttons, when setting this with hidden skip buttons it looks like this:<br>
 <img width="248" height="64" alt="image" src="https://github.com/user-attachments/assets/553941d4-68ae-495c-b44b-d9f1a6f694e3" />
 #### Play/Pause/Next/Previous Button Texture
-Custom Texture to use for the Buttons.
+Custom Texture to use for the Buttons. (forcefully rendered as a square)
 ## That Should Be All The Important Stuff, I Hope You Enjoy Using This!
 Also the inspiration for this is from https://www.reddit.com/r/Minecraft/comments/10br3xj/my_desktop_theme_for_2023 (you can also use hidamari and duek-datetime to get an almost perfect match to this :D)
 
