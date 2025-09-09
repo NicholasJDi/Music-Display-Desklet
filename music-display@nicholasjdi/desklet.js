@@ -403,11 +403,16 @@ MusicDisplayDesklet.prototype = {
         const nextTexture = this.btnNextTexture || basePath + "next.png";
 
         let playPauseFile = isPlaying ? pauseTexture : playTexture;
-        if (playPauseFile !== this._lastPlayPauseFile) {
-            this.btnPlayPause.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(playPauseFile), icon_size: this.buttonSize }));
-            this.btnPlayPause.height = this.buttonSize;
-            this._lastPlayPauseFile = playPauseFile;
-        }
+        if (playPauseFile !== this._lastPlayPauseFile || this._lastPlayPauseSize !== this.buttonSize) {
+		    this.btnPlayPause.set_child(new St.Icon({
+		        gicon: Gio.icon_new_for_string(playPauseFile),
+		        icon_size: this.buttonSize
+		    }));
+		    this.btnPlayPause.height = this.buttonSize;
+		    this._lastPlayPauseFile = playPauseFile;
+		    this._lastPlayPauseSize = this.buttonSize;
+		}
+
 
         if (!this.hideSkipButtons && !this.hideAllButtons) {
             let skipSize = Math.floor(this.buttonSize / 2);

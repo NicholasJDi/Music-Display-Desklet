@@ -100,23 +100,23 @@
     "step": 1
 	},
     "btn_play_texture": {
-        "type": "entry",
-        "description": "Play button texture path",
+        "type": "filechooser",
+        "description": "Play button texture",
         "default": ""
     },
     "btn_pause_texture": {
-        "type": "entry",
-        "description": "Pause button texture path",
+        "type": "filechooser",
+        "description": "Pause button texture",
         "default": ""
     },
     "btn_next_texture": {
-        "type": "entry",
-        "description": "Next button texture path",
+        "type": "filechooser",
+        "description": "Next button texture",
         "default": ""
     },
     "btn_prev_texture": {
-        "type": "entry",
-        "description": "Previous button texture path",
+        "type": "filechooser",
+        "description": "Previous button texture",
         "default": ""
     },
 
