@@ -25,7 +25,8 @@ The Album the Track is from.
 #### %player%
 The Player the Track is being played from. (rhytmbox,vlc,spotify)
 #### %[player] metadata:key%
-The Most unique of the format tags, it allows you to define raw metadata to grab based on the Player.
+The Most unique of the format tags, it allows you to define raw metadata to grab based on the Player.<br>
+Note: Having lots of these may heavly impact performance
 ##### [player]
 The Player the Track must be played from for this format tag to activate, the same as %player%.
 ##### metadata:key
@@ -34,7 +35,7 @@ Run: `playerctl metadata` to show Metadata for the current Track
 #### Example
 Using all of these tags we can set line 1 to "%title%" and set line 2 to "by %artist% from %album% track #%[rhythmbox] xesam:discNumber%%[spotify] xesam:discNumber%-%[rhythmbox] xesam:trackNumber%%[vlc] xesam:tracknumber%%[spotify] xesam:trackNumber%" (vlc doesn't support disc number) to show:<br>
 <img width="406" height="72" alt="Screenshot from 2025-09-08 09-18-34" src="https://github.com/user-attachments/assets/4d7c122e-f064-4c3c-9eb1-93e66f5b5087" /><br>
-for Rhythmbox, VLC and Spotify. (i'm using rhythmbox in these examples) and people probably won't be using vlc, i probably will remove it from my Whitelist. oh and about Whitelist,
+for Rhythmbox, VLC and Spotify. (i'm using rhythmbox in these examples) vlc has really bad Metadata support.
 ### Player Settings
 #### Track Polling Interval
 The Interval for how often Track data is updated.
@@ -55,8 +56,11 @@ Hide the Previous/Next Buttons, without setting Button Size it will look like th
 <img width="246" height="86" alt="image" src="https://github.com/user-attachments/assets/0b7090d3-2433-437e-8edf-4ae520925b5a" />
 #### Button Size
 The size of the Buttons, when setting this with hidden skip buttons it looks like this:<br>
-(no image cause this setting is broken somehow, i will fix it tomorrow)
-#### Play/Pause/Next/Previous Button Texture Path
-Path to a Custom Texture for the Buttons. in format file:///home/\<user\>/file_path/image.png 
-### That Should Be All The Important Stuff, I Hope You Enjoy Using This! (I Hated Making It, I Spent 24 Hours Strait On It. No Sleep.)
+<img width="248" height="64" alt="image" src="https://github.com/user-attachments/assets/553941d4-68ae-495c-b44b-d9f1a6f694e3" />
+#### Play/Pause/Next/Previous Button Texture
+Custom Texture to use for the Buttons.
+## That Should Be All The Important Stuff, I Hope You Enjoy Using This!
 Also the inspiration for this is from https://www.reddit.com/r/Minecraft/comments/10br3xj/my_desktop_theme_for_2023 (you can also use hidamari and duek-datetime to get an almost perfect match to this :D)
+
+if your wondering, this is my desktop:<br>
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/cc11758e-1f8a-448f-9da6-654ec6613bec" />
