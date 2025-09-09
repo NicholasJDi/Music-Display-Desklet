@@ -109,11 +109,7 @@ MusicDisplayDesklet.prototype = {
 
         // Context Menu Open Rhythmbox 
         this._menu.addAction(_('Open Rhythmbox'), Lang.bind(this, function () {
-        let subprocess = new Gio.Subprocess({
-            argv: ['rhythmbox'],
-            flags: Gio.SubprocessFlags.NONE,
-        });
-        subprocess.init(null);
+        GLib.spawn_command_line_async(`rhythmbox`);
         }));
         this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         // Context Menu Play/Pause Track
