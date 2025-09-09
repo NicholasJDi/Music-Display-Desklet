@@ -103,7 +103,7 @@ MusicDisplayDesklet.prototype = {
 
         this.labelArtist = new St.Label({
         text: "",
-        x_expand: true,
+        x_expand: true
         });
         this.textVBox.add_child(this.labelArtist);
 
@@ -454,19 +454,25 @@ MusicDisplayDesklet.prototype = {
         }
     },
 
-    _onPlayPausePressed: function() {
-        GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} play-pause`);
-        this._updateStatus();
+    _onPlayPausePressed: function(actor, event) {
+        if (event.get_button() === 1) {
+            GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} play-pause`);
+            this._updateStatus();
+        }
     },
 
-    _onPrevPressed: function() {
-        GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} previous`);
-        this._updateStatus();
+    _onPrevPressed: function(actor, event) {
+        if (event.get_button() === 1) {
+            GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} previous`);
+            this._updateStatus();
+        }
     },
 
-    _onNextPressed: function() {
-        GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} next`);
-        this._updateStatus();
+    _onNextPressed: function(actor, event) {
+        if (event.get_button() === 1) {
+            GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} next`);
+            this._updateStatus();
+        }
     },
 
     on_desklet_removed: function() {
