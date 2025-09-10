@@ -272,12 +272,8 @@ MusicDisplayDesklet.prototype = {
         if (this.debugMode) {
         global.log(`[music-display@nicholasjdi] Resetting text ` + title + ` ` + artist + ` ` + album + ` ` + playerName);
         }
-        let base1 = this.line1Format.replace(/%title%/g, title).replace(/%artist%/g, artist).replace(/%album%/g, album);
-        let base2 = this.line2Format.replace(/%title%/g, title).replace(/%artist%/g, artist).replace(/%album%/g, album);
-        if (playerName) {
-            base1 = base1.replace(/%player%/g, playerName);
-            base2 = base2.replace(/%player%/g, playerName);
-        }
+        let base1 = this.line1Format.replace(/%title%/g, title).replace(/%artist%/g, artist).replace(/%album%/g, album).replace(/%player%/g, playerName);
+        let base2 = this.line2Format.replace(/%title%/g, title).replace(/%artist%/g, artist).replace(/%album%/g, album).replace(/%player%/g, playerName);
 
         this._fetchPerPlayerMetadataAsync(base1, final1 => {
             if (final1 !== this._lastLine1) {
