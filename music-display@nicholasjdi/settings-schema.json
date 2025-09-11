@@ -154,6 +154,12 @@
         "description": "Treat whitelist as blacklist instead",
         "default": false
     },
+    "empty_values": {
+        "type": "entry",
+        "description": "Empty Values",
+        "default": "Unknown,None,N/A,0",
+        "tooltip":"Comma-separated list of values to treat as NULL in custom format tags"
+    },
     "debug_mode": {
     "type": "checkbox",
         "description": "Debug Mode",

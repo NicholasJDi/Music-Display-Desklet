@@ -97,13 +97,15 @@ MusicDisplayDesklet.prototype = {
 
         this.labelTitle = new St.Label({
 	    text: "Loading…",
-	    x_expand: true
+	    x_expand: true,
+        y_expand: true
         });
         this.textVBox.add_child(this.labelTitle);
 
         this.labelArtist = new St.Label({
         text: "",
-        x_expand: true
+        x_expand: true,
+        y_expand: true
         });
         this.textVBox.add_child(this.labelArtist);
 
@@ -236,34 +238,74 @@ MusicDisplayDesklet.prototype = {
     },
 
     _fetchPerPlayerMetadataAsync: function(formatStr, callback) {
-        const regex = /%\[([\w\-\.:]+)\]\s+([^%]+)%/g;
+        const emptyValues = (this.emptyValues || "").split(",").map(s => s.trim()).filter(Boolean);
+    
+        const resolveTag = (tagStr, cb) => {
+            let prefix = "", suffix = "", inner = tagStr;
+    
+            // Match both prefix and suffix, keeping spaces exactly
+            const matchBoth = tagStr.match(/^\((.*?)\)(.*)\((.*?)\)$/);
+            if (matchBoth) {
+                prefix = matchBoth[1];
+                inner = matchBoth[2];
+                suffix = matchBoth[3];
+            } else {
+                // Only prefix
+                const matchPrefix = tagStr.match(/^\((.*?)\)(.+)$/);
+                if (matchPrefix) { prefix = matchPrefix[1]; inner = matchPrefix[2]; }
+                else {
+                    // Only suffix
+                    const matchSuffix = tagStr.match(/^(.+?)\((.*?)\)$/);
+                    if (matchSuffix) { inner = matchSuffix[1]; suffix = matchSuffix[2]; }
+                }
+            }
+    
+            // Handle %[player]key% or %[] key%
+            let player = null, key = null;
+            const playerMatch = inner.match(/^\[(.*?)\]\s*(.+)$/);
+            if (playerMatch) { player = playerMatch[1]; key = playerMatch[2]; }  // keep spaces in key
+            else { key = inner; }
+    
+            const fetchMetadata = (playerName) => {
+                const args = [];
+                if (playerName) args.push(`--player=${playerName}`);
+                args.push('metadata', key);
+    
+                this._runPlayerctlAsync(args, val => {
+                    val = val || "";
+                    if (emptyValues.includes(val)) val = "";
+                    cb(val ? prefix + val + suffix : "");
+                });
+            };
+    
+            if (player === "") {
+                this._runPlayerctlAsync(['-l'], playersOut => {
+                    const firstPlayer = playersOut.split("\n").find(p => {
+                        if (!p) return false;
+                        if (!this.playerWhitelist || !this.playerWhitelist.trim()) return true;
+                        const players = this.playerWhitelist.split(",").map(x => x.trim());
+                        return this.treatWhitelistAsBlacklist ? !players.includes(p) : players.includes(p);
+                    }) || "Player";
+                    fetchMetadata(firstPlayer);
+                });
+            } else {
+                fetchMetadata(player || null);
+            }
+        };
+    
+        const regex = /%([^%]+)%/g;
         let matches = [], m;
-        while ((m = regex.exec(formatStr)) !== null) {
-            matches.push({ full: m[0], player: m[1], meta: m[2] });
-        }
+        while ((m = regex.exec(formatStr)) !== null) matches.push({ full: m[0], content: m[1] });
         if (!matches.length) { callback(formatStr); return; }
-
+    
         let pending = matches.length;
         let result = formatStr;
-
-        matches.forEach(match => {
-            const argv = ['playerctl', `--player=${match.player}`, 'metadata', match.meta];
-            let proc = new Gio.Subprocess({
-                argv: argv,
-                flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
-            });
-            proc.init(null);
-            proc.communicate_utf8_async(null, null, (p, res) => {
-                try {
-                    let [ok, stdout, stderr] = p.communicate_utf8_finish(res);
-                    let val = ok && stdout ? stdout.toString().trim() : "";
-                    result = result.replace(match.full, val);
-                } catch (e) {
-                    result = result.replace(match.full, "");
-                } finally {
-                    pending--;
-                    if (pending === 0) callback(result);
-                }
+    
+        matches.forEach(tag => {
+            resolveTag(tag.content, val => {
+                result = result.replace(tag.full, val);
+                pending--;
+                if (pending === 0) callback(result);
             });
         });
     },
