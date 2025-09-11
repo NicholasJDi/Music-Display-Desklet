@@ -43,6 +43,7 @@ MusicDisplayDesklet.prototype = {
         this.treatWhitelistAsBlacklist = false;
         this.pollInterval = DEFAULT_POLL_INTERVAL;
         this.idlePollInterval = DEFAULT_IDLE_POLL_INTERVAL;
+        this.emptyValues = "Unknown,None,N/A,0"
         this.debugMode = false;
 
         this.btnPlayTexture = basePath + "play.png";
@@ -181,6 +182,7 @@ MusicDisplayDesklet.prototype = {
         settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", bind(this, this._updateAll));
         settings.bind("poll_interval", "pollInterval", bind(this, this._resetPolling));
         settings.bind("idle_poll_interval", "idlePollInterval", bind(this, this._resetPolling));
+        settings.bind("empty_values", "emptyValues", bind(this, this._updateAll));
         settings.bind("debug_mode", "debugMode", bind(this, this._updateAll));
     },
 
@@ -273,7 +275,8 @@ MusicDisplayDesklet.prototype = {
     
                 this._runPlayerctlAsync(args, val => {
                     val = val || "";
-                    if (emptyValues.includes(val)) val = "";
+                    const normalized = val.trim();
+                    if (emptyValues.includes(normalized)) val = "";
                     cb(val ? prefix + val + suffix : "");
                 });
             };
