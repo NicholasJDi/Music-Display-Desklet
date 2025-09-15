@@ -9,6 +9,8 @@ I'm not sure what versions this is supported by so any help figuring that out wo
 ## Configuration
 Music Display Desklet is as configurable as i could get it. (without it being really performance heavy) 
 
+NOTE: This is currently outdated since i'm changing a lot of stuff.
+
 Desklet looks like this by default:<br>
 <img width="164" height="98" alt="Screenshot from 2025-09-08 08-43-38" src="https://github.com/user-attachments/assets/c7ed5d39-02f2-465a-8b24-719284d118dd" />
 
