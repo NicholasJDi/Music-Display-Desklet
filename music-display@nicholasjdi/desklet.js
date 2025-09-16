@@ -314,24 +314,44 @@ MusicDisplayDesklet.prototype = {
         });
     },
 
-    _updateText: function(title, artist, album, playerName) {
-        if (this.debugMode) {
-        global.log(`[music-display@nicholasjdi] Resetting text ` + title + ` ` + artist + ` ` + album + ` ` + playerName);
-        }
-        let base1 = this.line1Format.replace(/%title%/g, title).replace(/%artist%/g, artist).replace(/%album%/g, album).replace(/%player%/g, playerName);
-        let base2 = this.line2Format.replace(/%title%/g, title).replace(/%artist%/g, artist).replace(/%album%/g, album).replace(/%player%/g, playerName);
-
-        this._fetchPerPlayerMetadataAsync(base1, final1 => {
-            if (final1 !== this._lastLine1) {
-                this.labelTitle.set_text(final1);
-                this._lastLine1 = final1;
-            }
-        });
-        this._fetchPerPlayerMetadataAsync(base2, final2 => {
-            if (final2 !== this._lastLine2) {
-                this.labelArtist.set_text(final2);
-                this._lastLine2 = final2;
-            }
+    _updateText: function(playerName) {
+        // fetch the three metadata fields first
+        this._runPlayerctlAsync(['metadata', 'xesam:title'], outTitle => {
+            const title = outTitle || "Unknown Title";
+            this._runPlayerctlAsync(['metadata', 'xesam:artist'], outArtist => {
+                const artist = outArtist || "Unknown Artist";
+                this._runPlayerctlAsync(['metadata', 'xesam:album'], outAlbum => {
+                    const album = outAlbum || "Unknown Album";
+    
+                    if (this.debugMode) {
+                        global.log(`[music-display@nicholasjdi] Resetting text ${title} ${artist} ${album} ${playerName}`);
+                    }
+    
+                    let base1 = this.line1Format
+                        .replace(/%title%/g, title)
+                        .replace(/%artist%/g, artist)
+                        .replace(/%album%/g, album)
+                        .replace(/%player%/g, playerName);
+                    let base2 = this.line2Format
+                        .replace(/%title%/g, title)
+                        .replace(/%artist%/g, artist)
+                        .replace(/%album%/g, album)
+                        .replace(/%player%/g, playerName);
+    
+                    this._fetchPerPlayerMetadataAsync(base1, final1 => {
+                        if (final1 !== this._lastLine1) {
+                            this.labelTitle.set_text(final1);
+                            this._lastLine1 = final1;
+                        }
+                    });
+                        this._fetchPerPlayerMetadataAsync(base2, final2 => {
+                        if (final2 !== this._lastLine2) {
+                            this.labelArtist.set_text(final2);
+                            this._lastLine2 = final2;
+                        }
+                    });
+                });
+            });
         });
     },
 
@@ -359,10 +379,10 @@ MusicDisplayDesklet.prototype = {
                 this.spacingWidget.hide();
                 return true;
             } else if (this.labelTitle.get_text() === "playerctl is not installed") {
+                // playerctl was just installed — reset labels and force a full refresh
                 this._lastLine1 = null;
                 this._lastLine2 = null;
-                this._lastStatus = null;
-                this._lastMetadataDump = null; // new
+                this._lastStatus = null;  // Forces _updateStatus to reload info
                 this.labelTitle.set_text("");
                 this.labelArtist.set_text("");
             }
@@ -370,6 +390,7 @@ MusicDisplayDesklet.prototype = {
             this._runPlayerctlAsync(['status'], statusOut => {
                 const status = statusOut ? statusOut.trim() : "";
     
+                // Reset labels when switching to Playing/Paused
                 if (status && status !== "Stopped" && this._lastStatus !== status) {
                     this._lastLine1 = null;
                     this._lastLine2 = null;
@@ -380,10 +401,12 @@ MusicDisplayDesklet.prototype = {
                 let showButtons = true;
     
                 if (!status) {
+                    // No player
                     this.labelTitle.set_text(this.line1_no_player);
                     this.labelArtist.set_text(this.line2_no_player);
                     showButtons = false;
                 } else if (status === "Stopped") {
+                    // Player stopped
                     this._runPlayerctlAsync(['-l'], playersOut => {
                         let firstPlayer = playersOut.split("\n")[0] || "Player";
                         this.labelTitle.set_text(this.line1_stopped.replace(/%player%/g, firstPlayer));
@@ -393,18 +416,20 @@ MusicDisplayDesklet.prototype = {
                 } else {
                     // Playing or Paused
                     this._runPlayerctlAsync(['metadata'], metadataDump => {
-                        // If the metadata string hasn't changed, skip
-                        if (metadataDump === this._lastMetadataDump && status === this._lastMetadataStatus) {
+                        const dump = metadataDump || "";
+    
+                        // Skip metadata fetch if nothing changed
+                        if (dump === this._lastMetadataDump && status === this._lastMetadataStatus) {
                             if (this.debugMode) {
                                 global.log(`[music-display@nicholasjdi] Metadata unchanged, skipping update`);
                             }
                             return;
                         }
     
-                        this._lastMetadataDump = metadataDump;
+                        this._lastMetadataDump = dump;
                         this._lastMetadataStatus = status;
     
-                        // Now fetch the first player only if we need metadata
+                        // Now get first player and update text
                         this._runPlayerctlAsync(['-l'], playersOut => {
                             let firstPlayer = playersOut.split("\n").find(p => {
                                 if (!p) return false;
@@ -413,27 +438,18 @@ MusicDisplayDesklet.prototype = {
                                 return this.treatWhitelistAsBlacklist ? !players.includes(p) : players.includes(p);
                             }) || "Player";
     
-                            // Fetch title, artist, album separately
-                            this._runPlayerctlAsync(['metadata', 'xesam:title'], outTitle => {
-                                const title = outTitle || "Unknown Title";
-                                this._runPlayerctlAsync(['metadata', 'xesam:artist'], outArtist => {
-                                    const artist = outArtist || "Unknown Artist";
-                                    this._runPlayerctlAsync(['metadata', 'xesam:album'], outAlbum => {
-                                        const album = outAlbum || "Unknown Album";
+                            // *** NEW: just call your updated _updateText ***
+                            this._updateText(firstPlayer);
     
-                                        this._updateText(title, artist, album, firstPlayer);
-    
-                                        const isPlaying = (status === "Playing");
-                                        this._updateButtonTextures(isPlaying);
-                                    });
-                                });
-                            });
+                            const isPlaying = (status === "Playing");
+                            this._updateButtonTextures(isPlaying);
                         });
                     });
     
                     showButtons = true;
                 }
     
+                // Buttons / spacing
                 if (!showButtons || this.hideAllButtons) {
                     this.buttonVBox.hide();
                     this.spacingWidget.hide();
