@@ -256,8 +256,8 @@ MusicDisplayDesklet.prototype = {
     },
 
     _fetchCustomTagsAsync: function(formatStr, callback) {
-        // Quick check: if it doesn't contain all required chars, return the string as-is
-        if (!formatStr.includes('%') || !formatStr.includes('(') || !formatStr.includes(')') || !formatStr.includes('[') || !formatStr.includes(']')) {
+        // Quick check: if no % just return
+        if (!formatStr.includes('%')) {
             callback(formatStr);
             return;
         }
@@ -279,7 +279,7 @@ MusicDisplayDesklet.prototype = {
                 return;
             }
     
-            // append text before %
+            // append literal text before %
             result += formatStr.slice(idx, nextPercent);
             idx = nextPercent;
     
@@ -300,7 +300,7 @@ MusicDisplayDesklet.prototype = {
             }
     
             if (!found) {
-                // invalid tag, just append the remaining text
+                // invalid tag, append rest
                 result += formatStr.slice(idx);
                 callback(result);
                 return;
@@ -309,19 +309,25 @@ MusicDisplayDesklet.prototype = {
             const tagContent = formatStr.slice(idx + 1, end); // between % and %
             idx = end + 1; // move past closing %
     
-            // Extract prefix (first ()), suffix (last ()), and [player]
-            const prefixMatch = tagContent.match(/^\((.*?)\)/);
-            const suffixMatch = tagContent.match(/\((.*?)\)$/);
-            const prefix = prefixMatch ? prefixMatch[1] : "";
-            const suffix = suffixMatch ? suffixMatch[1] : "";
+            // Extract prefix and suffix correctly:
+            let prefix = "", suffix = "", middle = tagContent;
     
-            const middle = tagContent.replace(/^\(.*?\)/, '').replace(/\(.*?\)$/, '');
+            const prefixMatch = middle.match(/^\((.*?)\)/);
+            if (prefixMatch) {
+                prefix = prefixMatch[1];
+                middle = middle.slice(prefixMatch[0].length);
+            }
+            const suffixMatch = middle.match(/\((.*?)\)$/);
+            if (suffixMatch) {
+                suffix = suffixMatch[1];
+                middle = middle.slice(0, middle.length - suffixMatch[0].length);
+            }
+    
             const playerMatch = middle.match(/^\[(.*?)\](.*)$/);
-            let player = "";
-            let metadataKey = "";
+            let player = null, metadataKey = "";
     
             if (playerMatch) {
-                player = playerMatch[1];
+                player = playerMatch[1] === "" ? null : playerMatch[1];
                 metadataKey = playerMatch[2];
             } else {
                 // invalid format, skip tag
@@ -330,12 +336,10 @@ MusicDisplayDesklet.prototype = {
             }
     
             if (!metadataKey) {
-                // invalid metadata:tag, skip tag
+                // invalid metadata:tag, skip
                 processNext();
                 return;
             }
-    
-            if (!player) player = null; // will be replaced with whitelist
     
             const fetchMetadata = (playerName) => {
                 let args = [];
@@ -344,12 +348,12 @@ MusicDisplayDesklet.prototype = {
     
                 this._runPlayerctlAsync(args, val => {
                     if (!val || emptyValues.includes(val.trim())) {
-                        // invalid metadata, skip processing prefix/suffix
+                        // invalid metadata, skip prefix/suffix
                         processNext();
                         return;
                     }
     
-                    // recursively process prefix and suffix
+                    // recursively process prefix and suffix so they can have tags
                     this._fetchCustomTagsAsync(prefix, finalPrefix => {
                         this._fetchCustomTagsAsync(suffix, finalSuffix => {
                             result += finalPrefix + val + finalSuffix;
