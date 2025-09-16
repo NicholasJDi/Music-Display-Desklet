@@ -7,7 +7,7 @@
         "type": "entry",
         "description": "Format",
         "default": "%title%",
-        "tooltip": "Use %title%, %artist%, %album%, %player%, %[player] metadata:key% for dynamic display"
+        "tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display"
     },
     "line1_font": {
         "type": "entry",
@@ -42,7 +42,7 @@
         "type": "entry",
         "description": "Format",
         "default": "%artist%",
-        "tooltip": "Use %title%, %artist%, %album%, %player%, %[player] metadata:key% for dynamic display"
+        "tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display"
     },
     "line2_font": {
         "type": "entry",
@@ -85,7 +85,7 @@
         "type": "checkbox",
         "description": "Hide all buttons",
         "default": false,
-        "tooltip":"(overrides hide skip buttons)"
+        "tooltip":"(overrides hide skip buttons when true)"
     },
     "hide_skip_buttons": {
         "type": "checkbox",
