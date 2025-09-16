@@ -256,48 +256,111 @@ MusicDisplayDesklet.prototype = {
     },
 
     _fetchCustomTagsAsync: function(formatStr, callback) {
+        // Quick check: if it doesn't contain all required chars, return the string as-is
+        if (!formatStr.includes('%') || !formatStr.includes('(') || !formatStr.includes(')') || !formatStr.includes('[') || !formatStr.includes(']')) {
+            callback(formatStr);
+            return;
+        }
+    
         const emptyValues = (this.emptyValues || "").split(",").map(s => s.trim()).filter(Boolean);
+        let result = "";
+        let idx = 0;
     
-        const resolveTag = (tagStr, cb) => {
-            let prefix = "", suffix = "", inner = tagStr;
-    
-            // Match both prefix and suffix, keeping spaces exactly
-            const matchBoth = tagStr.match(/^\((.*?)\)(.*)\((.*?)\)$/);
-            if (matchBoth) {
-                prefix = matchBoth[1];
-                inner = matchBoth[2];
-                suffix = matchBoth[3];
-            } else {
-                // Only prefix
-                const matchPrefix = tagStr.match(/^\((.*?)\)(.+)$/);
-                if (matchPrefix) { prefix = matchPrefix[1]; inner = matchPrefix[2]; }
-                else {
-                    // Only suffix
-                    const matchSuffix = tagStr.match(/^(.+?)\((.*?)\)$/);
-                    if (matchSuffix) { inner = matchSuffix[1]; suffix = matchSuffix[2]; }
-                }
+        const processNext = () => {
+            if (idx >= formatStr.length) {
+                callback(result);
+                return;
             }
     
-            // Handle %[player]key% or %[] key%
-            let player = null, key = null;
-            const playerMatch = inner.match(/^\[(.*?)\]\s*(.+)$/);
-            if (playerMatch) { player = playerMatch[1]; key = playerMatch[2]; }  // keep spaces in key
-            else { key = inner; }
+            let nextPercent = formatStr.indexOf('%', idx);
+            if (nextPercent === -1) {
+                result += formatStr.slice(idx);
+                callback(result);
+                return;
+            }
+    
+            // append text before %
+            result += formatStr.slice(idx, nextPercent);
+            idx = nextPercent;
+    
+            // parse the full tag
+            let stack = [];
+            let end = idx + 1;
+            let found = false;
+            while (end < formatStr.length) {
+                if (formatStr[end] === '%' && stack.length === 0) {
+                    found = true;
+                    break;
+                } else if (formatStr[end] === '(') {
+                    stack.push('(');
+                } else if (formatStr[end] === ')') {
+                    if (stack.length) stack.pop();
+                }
+                end++;
+            }
+    
+            if (!found) {
+                // invalid tag, just append the remaining text
+                result += formatStr.slice(idx);
+                callback(result);
+                return;
+            }
+    
+            const tagContent = formatStr.slice(idx + 1, end); // between % and %
+            idx = end + 1; // move past closing %
+    
+            // Extract prefix (first ()), suffix (last ()), and [player]
+            const prefixMatch = tagContent.match(/^\((.*?)\)/);
+            const suffixMatch = tagContent.match(/\((.*?)\)$/);
+            const prefix = prefixMatch ? prefixMatch[1] : "";
+            const suffix = suffixMatch ? suffixMatch[1] : "";
+    
+            const middle = tagContent.replace(/^\(.*?\)/, '').replace(/\(.*?\)$/, '');
+            const playerMatch = middle.match(/^\[(.*?)\](.*)$/);
+            let player = "";
+            let metadataKey = "";
+    
+            if (playerMatch) {
+                player = playerMatch[1];
+                metadataKey = playerMatch[2];
+            } else {
+                // invalid format, skip tag
+                processNext();
+                return;
+            }
+    
+            if (!metadataKey) {
+                // invalid metadata:tag, skip tag
+                processNext();
+                return;
+            }
+    
+            if (!player) player = null; // will be replaced with whitelist
     
             const fetchMetadata = (playerName) => {
-                const args = [];
+                let args = [];
                 if (playerName) args.push(`--player=${playerName}`);
-                args.push('metadata', key);
+                args.push('metadata', metadataKey);
     
                 this._runPlayerctlAsync(args, val => {
-                    val = val || "";
-                    const normalized = val.trim();
-                    if (emptyValues.includes(normalized)) val = "";
-                    cb(val ? prefix + val + suffix : "");
+                    if (!val || emptyValues.includes(val.trim())) {
+                        // invalid metadata, skip processing prefix/suffix
+                        processNext();
+                        return;
+                    }
+    
+                    // recursively process prefix and suffix
+                    this._fetchCustomTagsAsync(prefix, finalPrefix => {
+                        this._fetchCustomTagsAsync(suffix, finalSuffix => {
+                            result += finalPrefix + val + finalSuffix;
+                            processNext();
+                        });
+                    });
                 });
             };
     
-            if (player === "") {
+            if (player === null) {
+                // use first player from whitelist
                 this._runPlayerctlAsync(['-l'], playersOut => {
                     const firstPlayer = playersOut.split("\n").find(p => {
                         if (!p) return false;
@@ -305,28 +368,15 @@ MusicDisplayDesklet.prototype = {
                         const players = this.playerWhitelist.split(",").map(x => x.trim());
                         return this.treatWhitelistAsBlacklist ? !players.includes(p) : players.includes(p);
                     }) || "Player";
+    
                     fetchMetadata(firstPlayer);
                 });
             } else {
-                fetchMetadata(player || null);
+                fetchMetadata(player);
             }
         };
     
-        const regex = /%([^%]+)%/g;
-        let matches = [], m;
-        while ((m = regex.exec(formatStr)) !== null) matches.push({ full: m[0], content: m[1] });
-        if (!matches.length) { callback(formatStr); return; }
-    
-        let pending = matches.length;
-        let result = formatStr;
-    
-        matches.forEach(tag => {
-            resolveTag(tag.content, val => {
-                result = result.replace(tag.full, val);
-                pending--;
-                if (pending === 0) callback(result);
-            });
-        });
+        processNext();
     },
 
     _updateText: function(playerName) {
