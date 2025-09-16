@@ -59,6 +59,7 @@ MusicDisplayDesklet.prototype = {
         this._lastPlayPauseFile = null;
         this._lastPlayerName = null;
         this._lastMetadataDump = null;
+        this._currentPlayer = null;
 
         // Settings
         this.settings = new Settings.DeskletSettings(this, this.metadata.uuid, instance_id);
@@ -310,30 +311,26 @@ MusicDisplayDesklet.prototype = {
             idx = end + 1; // move past closing %
     
             // --- Robust prefix/suffix extraction using stack-aware parsing ---
-    
             let prefix = "", suffix = "", middle = tagContent;
     
-        // Extract prefix if it starts with '(' — find matching ')' allowing nested ()
+            // Extract prefix if it starts with '(' — find matching ')'
             if (middle.startsWith('(')) {
                 let depth = 0;
-                let i;
-                for (i = 0; i < middle.length; i++) {
+                for (let i = 0; i < middle.length; i++) {
                     const ch = middle[i];
                     if (ch === '(') depth++;
                     else if (ch === ')') {
                         depth--;
                         if (depth === 0) {
-                            // prefix is between the outermost pair
                             prefix = middle.slice(1, i);
                             middle = middle.slice(i + 1);
                             break;
                         }
                     }
                 }
-                // if loop finishes without finding a match we treat as no prefix (fallthrough)
             }
     
-            // Extract suffix if it ends with ')' — find matching '(' allowing nested ()
+            // Extract suffix if it ends with ')' — find matching '('
             if (middle.length && middle[middle.length - 1] === ')') {
                 let depth = 0;
                 for (let j = middle.length - 1; j >= 0; j--) {
@@ -342,23 +339,21 @@ MusicDisplayDesklet.prototype = {
                     else if (ch === '(') {
                         depth--;
                         if (depth === 0) {
-                            // suffix is inside this matched pair
                             suffix = middle.slice(j + 1, middle.length - 1);
                             middle = middle.slice(0, j);
                             break;
                         }
                     }
                 }
-                // if loop finishes without finding a match we treat as no suffix
             }
     
-            // Handle %[player]key% or %[] key%
+            // Handle %[player]key% or %[]key%
             const playerMatch = middle.match(/^\[(.*?)\](.*)$/);
             let player = "";
             let metadataKey = "";
     
             if (playerMatch) {
-                player = playerMatch[1];
+                player = playerMatch[1]; // may be empty
                 metadataKey = playerMatch[2];
             } else {
                 // invalid format, skip tag
@@ -372,7 +367,18 @@ MusicDisplayDesklet.prototype = {
                 return;
             }
     
-            if (!player) player = null; // will be replaced with whitelist
+            // decide which player to use
+            if (player === "") {
+                // user left [ ] empty: use current player from _updateStatus
+                player = this._currentPlayer || null;
+            } else {
+                // user specified a player name — only allow if it matches _currentPlayer
+                if (this._currentPlayer && player !== this._currentPlayer) {
+                    // skip this tag entirely, no prefix/suffix
+                    processNext();
+                    return;
+                }
+            }
     
             const fetchMetadata = (playerName) => {
                 let args = [];
@@ -396,8 +402,8 @@ MusicDisplayDesklet.prototype = {
                 });
             };
     
-            if (player === null) {
-                // use first player from whitelist
+            // if player is null (no player yet), try first whitelist player
+            if (!player) {
                 this._runPlayerctlAsync(['-l'], playersOut => {
                     const firstPlayer = playersOut.split("\n").find(p => {
                         if (!p) return false;
@@ -405,7 +411,6 @@ MusicDisplayDesklet.prototype = {
                         const players = this.playerWhitelist.split(",").map(x => x.trim());
                         return this.treatWhitelistAsBlacklist ? !players.includes(p) : players.includes(p);
                     }) || "Player";
-    
                     fetchMetadata(firstPlayer);
                 });
             } else {
@@ -501,18 +506,35 @@ MusicDisplayDesklet.prototype = {
                     showButtons = false;
                 } else {
                     // Playing / Paused
-                    this._runPlayerctlAsync(['-l'], playersOut => {
-                        let firstPlayer = playersOut.split("\n").find(p => {
-                            if (!p) return false;
-                            if (!this.playerWhitelist || !this.playerWhitelist.trim()) return true;
-                            const players = this.playerWhitelist.split(",").map(x => x.trim());
-                            return this.treatWhitelistAsBlacklist ? !players.includes(p) : players.includes(p);
-                        }) || "Player";
-    
-                        this._updateText(firstPlayer);
-                        const isPlaying = (status === "Playing");
-                        this._updateButtonTextures(isPlaying);
-                    });
+					this._runPlayerctlAsync(['-l'], playersOut => {
+					    // build clean array of reported players
+					    const playersList = (playersOut || "").split("\n").map(s => s && s.trim()).filter(Boolean);
+						    if (this.debugMode) global.log(`[music-display@nicholasjdi] playersOut: ${JSON.stringify(playersList)}`);
+					
+					    const whitelist = (this.playerWhitelist || "").split(",").map(x => x.trim()).filter(Boolean);
+					
+					    // choose a reported entry where the base name (before '.') matches whitelist (or any if whitelist empty)
+					    const pick = playersList.find(p => {
+					        if (!p) return false;
+					        const base = p.split(".")[0];                   // normalize reported name
+					        if (!whitelist.length) return true;             // no whitelist => accept first valid
+					        return this.treatWhitelistAsBlacklist
+					            ? !whitelist.includes(base)
+					            : whitelist.includes(base);
+					    }) || "Player";
+					
+					    // normalise to base name (e.g. firefox.12345 -> firefox)
+					    const firstPlayer = (pick && typeof pick === 'string') ? pick.split(".")[0] : "Player";
+					
+					    // store normalized current player for tag checks
+					    this._currentPlayer = firstPlayer;
+					
+					    if (this.debugMode) global.log(`[music-display@nicholasjdi] selected raw: ${pick} -> firstPlayer: ${firstPlayer}`);
+					
+					    this._updateText(firstPlayer);
+					    const isPlaying = (status === "Playing");
+					    this._updateButtonTextures(isPlaying);
+					});
                 }
     
                 if (!showButtons || this.hideAllButtons) {
