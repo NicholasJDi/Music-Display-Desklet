@@ -256,8 +256,8 @@ MusicDisplayDesklet.prototype = {
     },
 
     _fetchCustomTagsAsync: function(formatStr, callback) {
-        // Quick check: if no % just return
-        if (!formatStr.includes('%')) {
+        // Quick check: if it doesn't contain all required chars, return the string as-is
+        if (!formatStr.includes('%') || !formatStr.includes('(') || !formatStr.includes(')') || !formatStr.includes('[') || !formatStr.includes(']')) {
             callback(formatStr);
             return;
         }
@@ -279,11 +279,11 @@ MusicDisplayDesklet.prototype = {
                 return;
             }
     
-            // append literal text before %
+            // append text before %
             result += formatStr.slice(idx, nextPercent);
             idx = nextPercent;
     
-            // parse the full tag
+            // parse the full tag (respect parentheses so % inside (...) is ignored)
             let stack = [];
             let end = idx + 1;
             let found = false;
@@ -300,7 +300,7 @@ MusicDisplayDesklet.prototype = {
             }
     
             if (!found) {
-                // invalid tag, append rest
+                // invalid tag, just append the remaining text
                 result += formatStr.slice(idx);
                 callback(result);
                 return;
@@ -309,25 +309,56 @@ MusicDisplayDesklet.prototype = {
             const tagContent = formatStr.slice(idx + 1, end); // between % and %
             idx = end + 1; // move past closing %
     
-            // Extract prefix and suffix correctly:
+            // --- Robust prefix/suffix extraction using stack-aware parsing ---
+    
             let prefix = "", suffix = "", middle = tagContent;
     
-            const prefixMatch = middle.match(/^\((.*?)\)/);
-            if (prefixMatch) {
-                prefix = prefixMatch[1];
-                middle = middle.slice(prefixMatch[0].length);
-            }
-            const suffixMatch = middle.match(/\((.*?)\)$/);
-            if (suffixMatch) {
-                suffix = suffixMatch[1];
-                middle = middle.slice(0, middle.length - suffixMatch[0].length);
+        // Extract prefix if it starts with '(' — find matching ')' allowing nested ()
+            if (middle.startsWith('(')) {
+                let depth = 0;
+                let i;
+                for (i = 0; i < middle.length; i++) {
+                    const ch = middle[i];
+                    if (ch === '(') depth++;
+                    else if (ch === ')') {
+                        depth--;
+                        if (depth === 0) {
+                            // prefix is between the outermost pair
+                            prefix = middle.slice(1, i);
+                            middle = middle.slice(i + 1);
+                            break;
+                        }
+                    }
+                }
+                // if loop finishes without finding a match we treat as no prefix (fallthrough)
             }
     
+            // Extract suffix if it ends with ')' — find matching '(' allowing nested ()
+            if (middle.length && middle[middle.length - 1] === ')') {
+                let depth = 0;
+                for (let j = middle.length - 1; j >= 0; j--) {
+                    const ch = middle[j];
+                    if (ch === ')') depth++;
+                    else if (ch === '(') {
+                        depth--;
+                        if (depth === 0) {
+                            // suffix is inside this matched pair
+                            suffix = middle.slice(j + 1, middle.length - 1);
+                            middle = middle.slice(0, j);
+                            break;
+                        }
+                    }
+                }
+                // if loop finishes without finding a match we treat as no suffix
+            }
+    
+            // Handle %[player]key% or %[] key%
             const playerMatch = middle.match(/^\[(.*?)\](.*)$/);
-            let player = null, metadataKey = "";
+            let player = "";
+            let metadataKey = "";
     
             if (playerMatch) {
-                player = playerMatch[1] === "" ? null : playerMatch[1];
+                player = playerMatch[1];
                 metadataKey = playerMatch[2];
             } else {
                 // invalid format, skip tag
@@ -336,10 +367,12 @@ MusicDisplayDesklet.prototype = {
             }
     
             if (!metadataKey) {
-                // invalid metadata:tag, skip
+                // invalid metadata:tag, skip tag
                 processNext();
                 return;
             }
+    
+            if (!player) player = null; // will be replaced with whitelist
     
             const fetchMetadata = (playerName) => {
                 let args = [];
@@ -348,12 +381,12 @@ MusicDisplayDesklet.prototype = {
     
                 this._runPlayerctlAsync(args, val => {
                     if (!val || emptyValues.includes(val.trim())) {
-                        // invalid metadata, skip prefix/suffix
+                        // invalid metadata, skip processing prefix/suffix
                         processNext();
                         return;
                     }
     
-                    // recursively process prefix and suffix so they can have tags
+                    // recursively process prefix and suffix
                     this._fetchCustomTagsAsync(prefix, finalPrefix => {
                         this._fetchCustomTagsAsync(suffix, finalSuffix => {
                             result += finalPrefix + val + finalSuffix;
