@@ -130,7 +130,7 @@
     "description": "Track polling interval (seconds)",
 	"tooltip": "How often the desklet checks the current track. (playing/paused)\nWARNING: Lower values may heavily effect your system, it is not recommended to go below 1.0 track poll interval.",
     "default": 1,
-    "min": 0.1,
+    "min": 0.3,
     "max": 10,
     "step": 0.1
 	},
