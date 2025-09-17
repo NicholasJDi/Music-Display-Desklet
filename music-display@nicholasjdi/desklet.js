@@ -53,11 +53,9 @@ MusicDisplayDesklet.prototype = {
 
         // Track last displayed info
         this._lastStatus = null;
-		this._lastMetadataStatus = null;
         this._lastLine1 = null;
         this._lastLine2 = null;
         this._lastPlayPauseFile = null;
-        this._lastPlayerName = null;
         this._lastMetadataDump = null;
         this._currentPlayer = null;
 
@@ -452,7 +450,7 @@ MusicDisplayDesklet.prototype = {
                         .replace(/%album%/g, album)
                         .replace(/%player%/g, playerName);
     
-                    // handle any %tags%
+                    // handle custom tags
                     this._fetchCustomTagsAsync(base1, final1 => {
                         if (final1 !== this._lastLine1) {
                             this.labelTitle.set_text(final1);
@@ -490,53 +488,83 @@ MusicDisplayDesklet.prototype = {
                     this._lastLine2 = null;
                 }
     
+                const statusChanged = (status !== this._lastStatus);
                 this._lastStatus = status;
+    
                 let showButtons = true;
     
                 if (!status) {
+                    // No player
                     this.labelTitle.set_text(this.line1_no_player);
                     this.labelArtist.set_text(this.line2_no_player);
                     showButtons = false;
                 } else if (status === "Stopped") {
+                    // Player stopped
                     this._runPlayerctlAsync(['-l'], playersOut => {
-                        let firstPlayer = playersOut.split("\n")[0] || "Player";
+                        let firstPlayer = (playersOut || "").split("\n")[0] || "Player";
                         this.labelTitle.set_text(this.line1_stopped.replace(/%player%/g, firstPlayer));
                         this.labelArtist.set_text(this.line2_stopped.replace(/%player%/g, firstPlayer));
                     });
                     showButtons = false;
                 } else {
                     // Playing / Paused
-					this._runPlayerctlAsync(['-l'], playersOut => {
-					    // build clean array of reported players
-					    const playersList = (playersOut || "").split("\n").map(s => s && s.trim()).filter(Boolean);
-						    if (this.debugMode) global.log(`[music-display@nicholasjdi] playersOut: ${JSON.stringify(playersList)}`);
-					
-					    const whitelist = (this.playerWhitelist || "").split(",").map(x => x.trim()).filter(Boolean);
-					
-					    // choose a reported entry where the base name (before '.') matches whitelist (or any if whitelist empty)
-					    const pick = playersList.find(p => {
-					        if (!p) return false;
-					        const base = p.split(".")[0];                   // normalize reported name
-					        if (!whitelist.length) return true;             // no whitelist => accept first valid
-					        return this.treatWhitelistAsBlacklist
-					            ? !whitelist.includes(base)
-					            : whitelist.includes(base);
-					    }) || "Player";
-					
-					    // normalise to base name (e.g. firefox.12345 -> firefox)
-					    const firstPlayer = (pick && typeof pick === 'string') ? pick.split(".")[0] : "Player";
-					
-					    // store normalized current player for tag checks
-					    this._currentPlayer = firstPlayer;
-					
-					    if (this.debugMode) global.log(`[music-display@nicholasjdi] selected raw: ${pick} -> firstPlayer: ${firstPlayer}`);
-					
-					    this._updateText(firstPlayer);
-					    const isPlaying = (status === "Playing");
-					    this._updateButtonTextures(isPlaying);
-					});
+                    this._runPlayerctlAsync(['-l'], playersOut => {
+                        // build clean array of reported players
+                        const playersList = (playersOut || "").split("\n").map(s => s && s.trim()).filter(Boolean);
+    
+                        const whitelist = (this.playerWhitelist || "").split(",").map(x => x.trim()).filter(Boolean);
+    
+                        // choose a reported entry where the base name (before '.') matches whitelist (or any if whitelist empty)
+                        const pick = playersList.find(p => {
+                            if (!p) return false;
+                            const base = p.split(".")[0];                   // normalize reported name
+                            if (!whitelist.length) return true;             // no whitelist => accept first valid
+                            return this.treatWhitelistAsBlacklist
+                                ? !whitelist.includes(base)
+                                : whitelist.includes(base);
+                        }) || null; // null means no concrete pick
+    
+                        // normalise to base name (e.g. firefox.12345 -> firefox)
+                        const firstPlayer = pick ? pick.split(".")[0] : "Player";
+    
+                        // store normalized current player for tag checks
+                        this._currentPlayer = firstPlayer;
+    
+                        // Build metadata args. If we have a concrete pick (e.g. firefox.12345),
+                        // pass --player=pick so it overrides any whitelist flags (playerctl respects the rightmost --player=).
+                        const metaArgs = [];
+                        if (pick) metaArgs.push(`--player=${pick}`);
+                        metaArgs.push('metadata');
+    
+                        // Fetch full metadata dump and compare to last dump
+                        this._runPlayerctlAsync(metaArgs, metadataDump => {
+                            const dump = metadataDump || "";
+    
+                            const metadataChanged = (dump !== this._lastMetadataDump);
+    
+                            if (statusChanged || metadataChanged) {
+                                if (this.debugMode) {
+                                    global.log(`[music-display@nicholasjdi] update triggered (statusChanged=${statusChanged}, metadataChanged=${metadataChanged})`);
+                                }
+    
+                                // store new metadata dump and status
+                                this._lastMetadataDump = dump;
+                                this._lastMetadataStatus = status;
+    
+                                // Now update text/buttons
+                                this._updateText(firstPlayer);
+                                const isPlaying = (status === "Playing");
+                                this._updateButtonTextures(isPlaying);
+                            } else {
+                                if (this.debugMode) {
+                                    global.log(`[music-display@nicholasjdi] no change in metadata/status, skipping update`);
+                                }
+                            }
+                        });
+                    });
                 }
     
+                // Buttons / spacing (visibility is independent of whether we updated text)
                 if (!showButtons || this.hideAllButtons) {
                     this.buttonVBox.hide();
                     this.spacingWidget.hide();
