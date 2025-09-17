@@ -206,7 +206,7 @@ MusicDisplayDesklet.prototype = {
     },
 
     _updateAll: function() {
-		this._lastMetadataStatus = null;
+		this._lastStatus = null;
         this._updateFont();
         this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
         this._updateStatus();
