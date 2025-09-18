@@ -54,6 +54,10 @@ MusicDisplayDesklet.prototype = {
 		this._lastMetadataDump = null;
 		this._currentPlayer = null;
 
+		// Polling
+		this._currentInterval = null;
+		this._pollTimer = null;
+
 		// Settings
 		this.settings = new Settings.DeskletSettings(this, this.metadata.uuid, instance_id);
 
@@ -105,7 +109,7 @@ MusicDisplayDesklet.prototype = {
 		});
 		this.textVBox.add_child(this.labelArtist);
 
-		// Context Menu Open Rhythmbox 
+		// Context Menu Open Rhythmbox
 		this._menu.addAction(_('Open Rhythmbox'), Lang.bind(this, function () {
 		GLib.spawn_command_line_async(`rhythmbox`);
 		}));
@@ -133,7 +137,7 @@ MusicDisplayDesklet.prototype = {
 
 		// Initial run
 		this._updateAll();
-		this._startPolling();
+		this._startPolling(this.idlePollInterval);
 	},
 
 	_checkPlayerctlInstalled: function() {
@@ -177,18 +181,18 @@ MusicDisplayDesklet.prototype = {
 		settings.bind("debug_mode", "debugMode", bind(this, this._updateAll));
 	},
 
-	_startPolling: function() {
-		if (this._pollId) GLib.source_remove(this._pollId);
-
-		let interval = this._lastStatus && (this._lastStatus !== "Stopped") ? this.pollInterval : this.idlePollInterval;
-		if (interval >= 1) {
-			this._pollId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, Math.max(1, Math.round(interval)), Lang.bind(this, this._updateStatus));
-		} else {
-			let ms = Math.max(50, Math.round(interval * 1000));
-			this._pollId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, Lang.bind(this, this._updateStatus));
+	_startPolling: function(interval) {
+		// cancel existing timer if any
+		if (this._pollTimer) {
+			GLib.source_remove(this._pollTimer);
+			this._pollTimer = null;
 		}
+
+		// store and start new timer
+		this._currentInterval = interval;
+		this._pollTimer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, interval, Lang.bind(this, this._updateStatus));
 		if (this.debugMode) {
-		global.log(`[music-display@nicholasjdi] Polling every ${interval}s`);
+			global.log(`[music-display@nicholasjdi] resetting poll interval to ${this._currentInterval}s`);
 		}
 	},
 
@@ -197,7 +201,7 @@ MusicDisplayDesklet.prototype = {
 	},
 
 	_updateAll: function() {
-		this._lastStatus = null;
+		this._lastStatus = "Reload";
 		this._updateFont();
 		this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
 		this._updateStatus();
@@ -251,28 +255,28 @@ MusicDisplayDesklet.prototype = {
 			callback(formatStr);
 			return;
 		}
-	
+
 		const emptyValues = (this.emptyValues || "").split(",").map(s => s.trim()).filter(Boolean);
 		let result = "";
 		let idx = 0;
-	
+
 		const processNext = () => {
 			if (idx >= formatStr.length) {
 				callback(result);
 				return;
 			}
-	
+
 			let nextPercent = formatStr.indexOf('%', idx);
 			if (nextPercent === -1) {
 				result += formatStr.slice(idx);
 				callback(result);
 				return;
 			}
-	
+
 			// append text before %
 			result += formatStr.slice(idx, nextPercent);
 			idx = nextPercent;
-	
+
 			// parse the full tag (respect parentheses so % inside (...) is ignored)
 			let stack = [];
 			let end = idx + 1;
@@ -288,20 +292,20 @@ MusicDisplayDesklet.prototype = {
 				}
 				end++;
 			}
-	
+
 			if (!found) {
 				// invalid tag, just append the remaining text
 				result += formatStr.slice(idx);
 				callback(result);
 				return;
 			}
-	
+
 			const tagContent = formatStr.slice(idx + 1, end); // between % and %
 			idx = end + 1; // move past closing %
-	
+
 			// --- Robust prefix/suffix extraction using stack-aware parsing ---
 			let prefix = "", suffix = "", middle = tagContent;
-	
+
 			// Extract prefix if it starts with '(' — find matching ')'
 			if (middle.startsWith('(')) {
 				let depth = 0;
@@ -318,7 +322,7 @@ MusicDisplayDesklet.prototype = {
 					}
 				}
 			}
-	
+
 			// Extract suffix if it ends with ')' — find matching '('
 			if (middle.length && middle[middle.length - 1] === ')') {
 				let depth = 0;
@@ -335,12 +339,12 @@ MusicDisplayDesklet.prototype = {
 					}
 				}
 			}
-	
+
 			// Handle %[player]key% or %[]key%
 			const playerMatch = middle.match(/^\[(.*?)\](.*)$/);
 			let player = "";
 			let metadataKey = "";
-	
+
 			if (playerMatch) {
 				player = playerMatch[1]; // may be empty
 				metadataKey = playerMatch[2];
@@ -349,13 +353,13 @@ MusicDisplayDesklet.prototype = {
 				processNext();
 				return;
 			}
-	
+
 			if (!metadataKey) {
 				// invalid metadata:tag, skip tag
 				processNext();
 				return;
 			}
-	
+
 			// decide which player to use
 			if (player === "") {
 				// user left [ ] empty: use current player from _updateStatus
@@ -368,19 +372,19 @@ MusicDisplayDesklet.prototype = {
 					return;
 				}
 			}
-	
+
 			const fetchMetadata = (playerName) => {
 				let args = [];
 				if (playerName) args.push(`--player=${playerName}`);
 				args.push('metadata', metadataKey);
-	
+
 				this._runPlayerctlAsync(args, val => {
 					if (!val || emptyValues.includes(val.trim())) {
 						// invalid metadata, skip processing prefix/suffix
 						processNext();
 						return;
 					}
-	
+
 					// recursively process prefix and suffix
 					this._fetchCustomTagsAsync(prefix, finalPrefix => {
 						this._fetchCustomTagsAsync(suffix, finalSuffix => {
@@ -390,7 +394,7 @@ MusicDisplayDesklet.prototype = {
 					});
 				});
 			};
-	
+
 			// if player is null (no player yet), try first whitelist player
 			if (!player) {
 				this._runPlayerctlAsync(['-l'], playersOut => {
@@ -406,7 +410,7 @@ MusicDisplayDesklet.prototype = {
 				fetchMetadata(player);
 			}
 		};
-	
+
 		processNext();
 	},
 
@@ -414,7 +418,7 @@ MusicDisplayDesklet.prototype = {
 		const fields = ['xesam:title', 'xesam:artist', 'xesam:album'];
 		const results = {};
 		let pending = fields.length;
-	
+
 		fields.forEach(field => {
 			this._runPlayerctlAsync(['metadata', field], val => {
 				results[field] = val || (field === 'xesam:title' ? "Unknown Title" : field === 'xesam:artist' ? "Unknown Artist" : "Unknown Album");
@@ -424,17 +428,17 @@ MusicDisplayDesklet.prototype = {
 					const title = results['xesam:title'];
 					const artist = results['xesam:artist'];
 					const album = results['xesam:album'];
-	
+
 					if (this.debugMode) {
-						global.log(`[music-display@nicholasjdi] Resetting text ${title}, ${artist}, ${album}, ${playerName}.`);
+						global.log(`[music-display@nicholasjdi] Resetting text, ${title}, ${artist}, ${album}, ${playerName}.`);
 					}
-	
+
 					let base1 = this.line1Format
 						.replace(/%title%/g, title)
 						.replace(/%artist%/g, artist)
 						.replace(/%album%/g, album)
 						.replace(/%player%/g, playerName);
-	
+
 					let base2 = this.line2Format
 						.replace(/%title%/g, title)
 						.replace(/%artist%/g, artist)
@@ -442,13 +446,13 @@ MusicDisplayDesklet.prototype = {
 						.replace(/%player%/g, playerName);
 
 					// handle custom tags
-					this._fetchCustomTagsAsync(base1, final1 => {this.labelTitle.set_text(final1);});	
+					this._fetchCustomTagsAsync(base1, final1 => {this.labelTitle.set_text(final1);});
 					this._fetchCustomTagsAsync(base2, final2 => {this.labelArtist.set_text(final2);});
 				}
 			});
 		});
 	},
-	
+
 	_updateStatus: function() {
 		try {
 			if (!this._checkPlayerctlInstalled()) {
@@ -458,15 +462,24 @@ MusicDisplayDesklet.prototype = {
 				this.spacingWidget.hide();
 				return true;
 			}
-	
+
 			this._runPlayerctlAsync(['status'], statusOut => {
 				const status = statusOut ? statusOut.trim() : "";
-	
+
+				// check if we need to change polling interval
+				const newInterval = (status && status !== "Stopped")
+					? this.pollInterval
+					: this.idlePollInterval;
+
+				if (newInterval !== this._currentInterval) {
+					this._startPolling(newInterval);
+				}
+
 				const statusChanged = (status !== this._lastStatus);
 				this._lastStatus = status;
-	
+
 				let showButtons = true;
-	
+
 				if (!status) {
 					// No player
 					this.labelTitle.set_text(this.line1_no_player);
@@ -485,9 +498,9 @@ MusicDisplayDesklet.prototype = {
 					this._runPlayerctlAsync(['-l'], playersOut => {
 						// build clean array of reported players
 						const playersList = (playersOut || "").split("\n").map(s => s && s.trim()).filter(Boolean);
-	
+
 						const whitelist = (this.playerWhitelist || "").split(",").map(x => x.trim()).filter(Boolean);
-	
+
 						// choose a reported entry where the base name (before '.') matches whitelist (or any if whitelist empty)
 						const pick = playersList.find(p => {
 							if (!p) return false;
@@ -497,33 +510,33 @@ MusicDisplayDesklet.prototype = {
 								? !whitelist.includes(base)
 								: whitelist.includes(base);
 						}) || null; // null means no concrete pick
-	
+
 						// normalise to base name (e.g. firefox.12345 -> firefox)
 						const firstPlayer = pick ? pick.split(".")[0] : "Player";
-	
+
 						// store normalized current player for tag checks
 						this._currentPlayer = firstPlayer;
-	
+
 						// Build metadata args. If we have a concrete pick (e.g. firefox.12345),
 						// pass --player=pick so it overrides any whitelist flags (playerctl respects the rightmost --player=).
 						const metaArgs = [];
 						if (pick) metaArgs.push(`--player=${pick}`);
 						metaArgs.push('metadata');
-	
+
 						// Fetch full metadata dump and compare to last dump
 						this._runPlayerctlAsync(metaArgs, metadataDump => {
 							const dump = metadataDump || "";
-	
+
 							const metadataChanged = (dump !== this._lastMetadataDump);
-	
+
 							if (statusChanged || metadataChanged) {
 								if (this.debugMode) {
 									global.log(`[music-display@nicholasjdi] update triggered (statusChanged=${statusChanged}, metadataChanged=${metadataChanged})`);
 								}
-	
+
 								// store new metadata dump and status
 								this._lastMetadataDump = dump;
-	
+
 								// Now update text/buttons
 								this._updateText(firstPlayer);
 								const isPlaying = (status === "Playing");
@@ -536,7 +549,7 @@ MusicDisplayDesklet.prototype = {
 						});
 					});
 				}
-	
+
 				// Buttons / spacing (visibility is independent of whether we updated text)
 				if (!showButtons || this.hideAllButtons) {
 					this.buttonVBox.hide();
@@ -550,9 +563,12 @@ MusicDisplayDesklet.prototype = {
 			});
 		} catch (e) {
 			global.logError(`[music-display@nicholasjdi] _updateStatus exception: ${e}`);
+		} finally {
+			if (this.debugMode) {
+				global.log(`[music-display@nicholasjdi] polling every ${this._currentInterval}s`);
+			}
+			return true
 		}
-	
-		this._startPolling();
 	},
 
 	_updateButtonTextures: function(isPlaying) {
@@ -618,4 +634,3 @@ MusicDisplayDesklet.prototype = {
 function main(metadata, instance_id) {
 	return new MusicDisplayDesklet(metadata, instance_id);
 }
-
