@@ -6,9 +6,6 @@ const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 const Settings = imports.ui.settings;
 
-const DEFAULT_POLL_INTERVAL = 1;
-const DEFAULT_IDLE_POLL_INTERVAL = 3;
-
 function MusicDisplayDesklet(metadata, instance_id) {
     this._init(metadata, instance_id);
 }
@@ -41,8 +38,8 @@ MusicDisplayDesklet.prototype = {
 
         this.playerWhitelist = "rhythmbox,spotify";
         this.treatWhitelistAsBlacklist = false;
-        this.pollInterval = DEFAULT_POLL_INTERVAL;
-        this.idlePollInterval = DEFAULT_IDLE_POLL_INTERVAL;
+        this.pollInterval = 1;
+        this.idlePollInterval = 3;
         this.emptyValues = "Unknown,None,N/A,0"
         this.debugMode = false;
 
@@ -53,12 +50,9 @@ MusicDisplayDesklet.prototype = {
 
         // Track last displayed info
         this._lastStatus = null;
-        this._lastLine1 = null;
-        this._lastLine2 = null;
         this._lastPlayPauseFile = null;
         this._lastMetadataDump = null;
         this._currentPlayer = null;
-        this._pollId = null;
 
         // Settings
         this.settings = new Settings.DeskletSettings(this, this.metadata.uuid, instance_id);
@@ -136,10 +130,6 @@ MusicDisplayDesklet.prototype = {
         GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} stop`);
         this._updateStatus();
         }));
-
-
-        // Update when sizing changes
-        this.textVBox.connect('notify::allocation', Lang.bind(this, this._updateAll));
 
         // Initial run
         this._updateAll();
@@ -436,7 +426,7 @@ MusicDisplayDesklet.prototype = {
                     const album = results['xesam:album'];
     
                     if (this.debugMode) {
-                        global.log(`[music-display@nicholasjdi] Resetting text ${title} ${artist} ${album} ${playerName}`);
+                        global.log(`[music-display@nicholasjdi] Resetting text ${title}, ${artist}, ${album}, ${playerName}.`);
                     }
     
                     let base1 = this.line1Format
@@ -450,21 +440,15 @@ MusicDisplayDesklet.prototype = {
                         .replace(/%artist%/g, artist)
                         .replace(/%album%/g, album)
                         .replace(/%player%/g, playerName);
-    
+					
+					// handle time tags (this is unfinished')
+                    if (base1.includes('%time%') || base1.includes('%length%') || base2.includes('%time%') || base2.includes('%length%')) {
+					if (this.debugMode) {global.log(`[music-display@nicholasjdi] Processing time tags`);}
+					}
+
                     // handle custom tags
-                    this._fetchCustomTagsAsync(base1, final1 => {
-                        if (final1 !== this._lastLine1) {
-                            this.labelTitle.set_text(final1);
-                            this._lastLine1 = final1;
-                        }
-                    });
-    
-                    this._fetchCustomTagsAsync(base2, final2 => {
-                        if (final2 !== this._lastLine2) {
-                            this.labelArtist.set_text(final2);
-                            this._lastLine2 = final2;
-                        }
-                    });
+                    this._fetchCustomTagsAsync(base1, final1 => {this.labelTitle.set_text(final1);});    
+                    this._fetchCustomTagsAsync(base2, final2 => {this.labelArtist.set_text(final2);});
                 }
             });
         });
@@ -482,12 +466,6 @@ MusicDisplayDesklet.prototype = {
     
             this._runPlayerctlAsync(['status'], statusOut => {
                 const status = statusOut ? statusOut.trim() : "";
-    
-                // Reset labels if switching status
-                if (status && status !== "Stopped" && this._lastStatus !== status) {
-                    this._lastLine1 = null;
-                    this._lastLine2 = null;
-                }
     
                 const statusChanged = (status !== this._lastStatus);
                 this._lastStatus = status;
@@ -550,7 +528,6 @@ MusicDisplayDesklet.prototype = {
     
                                 // store new metadata dump and status
                                 this._lastMetadataDump = dump;
-                                this._lastMetadataStatus = status;
     
                                 // Now update text/buttons
                                 this._updateText(firstPlayer);
@@ -581,7 +558,6 @@ MusicDisplayDesklet.prototype = {
         }
     
         this._startPolling();
-        return true;
     },
 
     _updateButtonTextures: function(isPlaying) {
