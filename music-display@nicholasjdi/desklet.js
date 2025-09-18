@@ -190,14 +190,19 @@ MusicDisplayDesklet.prototype = {
 
 		// store and start new timer
 		this._currentInterval = interval;
-		this._pollTimer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, interval, Lang.bind(this, this._updateStatus));
+		const ms = Math.round(interval * 1000)
+		this._pollTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, Lang.bind(this, this._updateStatus));
 		if (this.debugMode) {
 			global.log(`[music-display@nicholasjdi] resetting poll interval to ${this._currentInterval}s`);
 		}
 	},
 
 	_resetPolling: function() {
-		this._startPolling();
+		const interval = (this._lastStatus && this._lastStatus !== "Stopped")
+			? this.pollInterval
+			: this.idlePollInterval;
+
+		this._startPolling(interval);
 	},
 
 	_updateAll: function() {
