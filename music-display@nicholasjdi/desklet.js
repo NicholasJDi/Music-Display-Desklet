@@ -58,6 +58,7 @@ MusicDisplayDesklet.prototype = {
         this._lastPlayPauseFile = null;
         this._lastMetadataDump = null;
         this._currentPlayer = null;
+        this._pollId = null;
 
         // Settings
         this.settings = new Settings.DeskletSettings(this, this.metadata.uuid, instance_id);
@@ -420,13 +421,19 @@ MusicDisplayDesklet.prototype = {
     },
 
     _updateText: function(playerName) {
-         // fetch the three metadata fields first
-        this._runPlayerctlAsync(['metadata', 'xesam:title'], outTitle => {
-            const title = outTitle || "Unknown Title";
-            this._runPlayerctlAsync(['metadata', 'xesam:artist'], outArtist => {
-                const artist = outArtist || "Unknown Artist";
-                this._runPlayerctlAsync(['metadata', 'xesam:album'], outAlbum => {
-                    const album = outAlbum || "Unknown Album";
+        const fields = ['xesam:title', 'xesam:artist', 'xesam:album'];
+        const results = {};
+        let pending = fields.length;
+    
+        fields.forEach(field => {
+            this._runPlayerctlAsync(['metadata', field], val => {
+                results[field] = val || (field === 'xesam:title' ? "Unknown Title" : field === 'xesam:artist' ? "Unknown Artist" : "Unknown Album");
+                pending--;
+                if (pending === 0) {
+                    // all metadata fetched, now build the display text
+                    const title = results['xesam:title'];
+                    const artist = results['xesam:artist'];
+                    const album = results['xesam:album'];
     
                     if (this.debugMode) {
                         global.log(`[music-display@nicholasjdi] Resetting text ${title} ${artist} ${album} ${playerName}`);
@@ -458,7 +465,7 @@ MusicDisplayDesklet.prototype = {
                             this._lastLine2 = final2;
                         }
                     });
-                });
+                }
             });
         });
     },
