@@ -440,11 +440,6 @@ MusicDisplayDesklet.prototype = {
 						.replace(/%artist%/g, artist)
 						.replace(/%album%/g, album)
 						.replace(/%player%/g, playerName);
-					
-					// handle time tags (this is unfinished')
-					if (base1.includes('%time%') || base1.includes('%length%') || base2.includes('%time%') || base2.includes('%length%')) {
-					if (this.debugMode) {global.log(`[music-display@nicholasjdi] Processing time tags`);}
-					}
 
 					// handle custom tags
 					this._fetchCustomTagsAsync(base1, final1 => {this.labelTitle.set_text(final1);});	
@@ -496,7 +491,7 @@ MusicDisplayDesklet.prototype = {
 						// choose a reported entry where the base name (before '.') matches whitelist (or any if whitelist empty)
 						const pick = playersList.find(p => {
 							if (!p) return false;
-							const base = p.split(".")[0];				   // normalize reported name
+							const base = p.split(".")[0];				 // normalize reported name
 							if (!whitelist.length) return true;			 // no whitelist => accept first valid
 							return this.treatWhitelistAsBlacklist
 								? !whitelist.includes(base)
