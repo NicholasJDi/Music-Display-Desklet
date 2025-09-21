@@ -439,16 +439,16 @@ MusicDisplayDesklet.prototype = {
 					}
 
 					let base1 = this.line1Format
-						.replace(/%title%/g, title)
-						.replace(/%artist%/g, artist)
-						.replace(/%album%/g, album)
-						.replace(/%player%/g, playerName);
+						.replace('%title%', title)
+						.replace('%artist%', artist)
+						.replace('%album%', album)
+						.replace('%player%', playerName);
 
 					let base2 = this.line2Format
-						.replace(/%title%/g, title)
-						.replace(/%artist%/g, artist)
-						.replace(/%album%/g, album)
-						.replace(/%player%/g, playerName);
+						.replace('%title%', title)
+						.replace('%artist%', artist)
+						.replace('%album%', album)
+						.replace('%player%', playerName);
 
 					// handle custom tags
 					this._fetchCustomTagsAsync(base1, final1 => {this.labelTitle.set_text(final1);});
@@ -494,8 +494,8 @@ MusicDisplayDesklet.prototype = {
 					// Player stopped
 					this._runPlayerctlAsync(['-l'], playersOut => {
 						let firstPlayer = (playersOut || "").split("\n")[0] || "Player";
-						this.labelTitle.set_text(this.line1_stopped.replace(/%player%/g, firstPlayer));
-						this.labelArtist.set_text(this.line2_stopped.replace(/%player%/g, firstPlayer));
+						this.labelTitle.set_text(this.line1_stopped.replace('%player%', firstPlayer));
+						this.labelArtist.set_text(this.line2_stopped.replace('%player%', firstPlayer));
 					});
 					showButtons = false;
 				} else {
