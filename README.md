@@ -1,5 +1,5 @@
 # Music Display Desklet
-A Linux Mint Cinnamon Desklet for displaying what is currently being played by players supporting the MPRIS D-Bus specification such as Rhythmbox, Firefox, Spotify, and more, using the playerctl command-line utility.
+A Linux Mint Cinnamon Desklet for displaying what is currently being played by Players supporting the MPRIS D-Bus Specification such as Rhythmbox, Firefox, Spotify, and more, using the playerctl command-line utility.
 
 >Note: The Code is really messy cause i do NOT know Javascript, this is my first time ever using it. (i know even less about CJS) But it works and i'm happy with it :D (also this was made with quite a lot of help from ChatGPT.)
 ## Instillation
