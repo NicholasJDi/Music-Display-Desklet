@@ -33,7 +33,7 @@
 	    "default": "Player %player% is stopped",
         "tooltip": "Use %player% to get running player id"
 	},
-	
+
     "head2": {
         "type": "header",
         "description": "Line 2 Settings"
@@ -95,7 +95,7 @@
 	"button_size": {
     "type": "scale",
     "description": "Button size (pixels)",
-    "default": 32,
+    "default": 34,
     "min": 8,
     "max": 128,
     "step": 1
@@ -167,4 +167,3 @@
         "tooltip":"Log debug outputs in cinnamon log"
     }
 }
-
