@@ -134,6 +134,11 @@ MusicDisplayDesklet.prototype = {
 		GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} stop`);
 		this._updateStatus();
 		}));
+		this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+		// Context Menu Reload Desklet
+		this._menu.addAction(_('Reload'), Lang.bind(this, function () {
+		this._updateAll();
+		}));
 
 		// Initial run
 		this._updateAll();
@@ -206,6 +211,8 @@ MusicDisplayDesklet.prototype = {
 	},
 
 	_updateAll: function() {
+		this.labelTitle.set_text("Loading...");
+		this.labelArtist.set_text("");
 		this._lastStatus = "Reload";
 		this._updateFont();
 		this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
