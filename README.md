@@ -3,7 +3,7 @@ A Linux Mint Cinnamon Desklet for displaying what is currently being played by P
 
 >Note: The Code is really messy cause i do NOT know Javascript, this is my first time ever using it. (i know even less about CJS) But it works and i'm happy with it :D (also this was made with quite a lot of help from ChatGPT.)
 ## Instillation
-Go to your Desklets folder `~/.local/share/cinnamon/desklets` (or create it if it doesn't exist) and run `git clone https://github.com/NicholasJDi/Music-Display-Desklet`, go inside the generated folder and drag out the `music-display@nicholasjdi` folder into the Desklets folder and delete the `Music-Display-Desklet` folder, run `sudo apt install playerctl` and you should be good to go! (of course enable the Desklet)
+Go to your Desklets folder `~/.local/share/cinnamon/desklets` (or create it if it doesn't exist) and run `git clone https://github.com/NicholasJDi/Music-Display-Desklet`, go inside the generated folder and drag out the `music-display@nicholasjdi` folder into the Desklets folder and delete the `Music-Display-Desklet folder`, run `sudo apt install playerctl` and you should be good to go! (of course enable the Desklet)
 
 I'm not sure what versions this is supported by so any help figuring that out would be appreciated, but i built this on Linux Mint 21.3 with Cinnamon 6.0.4 sorry if this doesn't work on your version.
 ## Configuration
