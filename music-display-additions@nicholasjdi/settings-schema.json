@@ -9,7 +9,7 @@
         "default": 200,
         "min": 10,
         "max": 400,
-        "step": 1,
+        "step": 10,
         "tooltip": "The X Size of the Desklet"
     },
     "y_size": {
@@ -18,7 +18,7 @@
         "default": 200,
         "min": 10,
         "max": 400,
-        "step": 1,
+        "step": 10,
         "tooltip": "The size of the Margin around Art"
     },
     "head2": {
