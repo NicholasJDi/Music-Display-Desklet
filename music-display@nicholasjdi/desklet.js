@@ -137,7 +137,7 @@ MusicDisplayDesklet.prototype = {
 
 		// Initial run
 		this._updateAll();
-		this._startPolling(this.idlePollInterval);
+		this._startPolling(this.pollInterval);
 	},
 
 	_checkPlayerctlInstalled: function() {
