@@ -76,7 +76,7 @@
         "type": "header",
         "description": "Art Settings"
     },
-    "text_enabled":{
+    "art_enabled":{
         "type": "checkbox",
         "description": "Enabled",
         "default": true
