@@ -92,20 +92,18 @@ MusicDisplayDesklet.prototype = {
 		this.mainBox.add_child(this.spacingWidget);
 
 		// Text column
-		this.textVBox = new St.BoxLayout({ vertical: true });
+		this.textVBox = new St.BoxLayout({ vertical: true, y_expand: true });
 		this.mainBox.add_child(this.textVBox);
 
 		this.labelTitle = new St.Label({
 		text: "Loading…",
-		x_expand: true,
-		y_expand: true
+		x_expand: true
 		});
 		this.textVBox.add_child(this.labelTitle);
 
 		this.labelArtist = new St.Label({
 		text: "",
-		x_expand: true,
-		y_expand: true
+		x_expand: true
 		});
 		this.textVBox.add_child(this.labelArtist);
 
