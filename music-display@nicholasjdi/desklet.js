@@ -138,6 +138,7 @@ MusicDisplayDesklet.prototype = {
 		// Context Menu Reload Desklet
 		this._menu.addAction(_('Reload'), Lang.bind(this, function () {
 		this._updateAll();
+		this._resetPolling;
 		}));
 
 		// Initial run
@@ -203,11 +204,7 @@ MusicDisplayDesklet.prototype = {
 	},
 
 	_resetPolling: function() {
-		const interval = (this._lastStatus && this._lastStatus !== "Stopped")
-			? this.pollInterval
-			: this.idlePollInterval;
-
-		this._startPolling(interval);
+		this._startPolling(pollInterval);
 	},
 
 	_updateAll: function() {
@@ -216,7 +213,6 @@ MusicDisplayDesklet.prototype = {
 		this._lastStatus = "Reload";
 		this._updateFont();
 		this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
-		this._updateStatus();
 	},
 
 	_updateFont: function() {
