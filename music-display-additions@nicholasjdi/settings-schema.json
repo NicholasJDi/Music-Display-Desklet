@@ -38,7 +38,7 @@
     },
     "font": {
         "type": "fontchooser",
-        "description": "Choose a font",
+        "description": "Font",
         "default": "sans 12"
     },
     "position": {
@@ -57,7 +57,7 @@
     "x_offset": {
         "type": "spinbutton",
         "description": "X Offset (pixels)",
-        "default": 0,
+        "default": -20,
         "min": -1000,
         "max": 1000,
         "step": 1,
@@ -66,7 +66,7 @@
     "y_offset": {
         "type": "spinbutton",
         "description": "Y Offset (pixels)",
-        "default": 0,
+        "default": 20,
         "min": -1000,
         "max": 1000,
         "step": 1,
