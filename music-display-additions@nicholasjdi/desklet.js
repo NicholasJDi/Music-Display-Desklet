@@ -61,9 +61,6 @@ MusicDisplayDesklet.prototype = {
 		// Settings
 		this.settings = new Settings.DeskletSettings(this, this.metadata.uuid, instance_id);
 
-		// Bind settings
-		this._bindSettings();
-
 		// Layout
 		this.mainBox = new St.BoxLayout({ vertical: false });
 		this.setContent(this.mainBox);
@@ -142,43 +139,6 @@ MusicDisplayDesklet.prototype = {
 
 	_checkPlayerctlInstalled: function() {
 	return !!GLib.find_program_in_path("playerctl");
-	},
-
-	_bindSettings: function() {
-		const settings = this.settings;
-		const bind = Lang.bind;
-
-		// Line 1
-		settings.bind("line1_format", "line1Format", bind(this, this._updateAll));
-		settings.bind("line1_font", "line1Font", bind(this, this._updateAll));
-		settings.bind("line1_size", "line1Size", bind(this, this._updateAll));
-		settings.bind("line1_no_player", "line1_no_player", bind(this, this._updateStatus));
-		settings.bind("line1_stopped", "line1_stopped", bind(this, this._updateStatus));
-
-		// Line 2
-		settings.bind("line2_format", "line2Format", bind(this, this._updateAll));
-		settings.bind("line2_font", "line2Font", bind(this, this._updateAll));
-		settings.bind("line2_size", "line2Size", bind(this, this._updateAll));
-		settings.bind("line2_no_player", "line2_no_player", bind(this, this._updateStatus));
-		settings.bind("line2_stopped", "line2_stopped", bind(this, this._updateStatus));
-
-		// Buttons
-		settings.bind("btn_play_texture", "btnPlayTexture", bind(this, this._updateAll));
-		settings.bind("btn_pause_texture", "btnPauseTexture", bind(this, this._updateAll));
-		settings.bind("btn_next_texture", "btnNextTexture", bind(this, this._updateAll));
-		settings.bind("btn_prev_texture", "btnPrevTexture", bind(this, this._updateAll));
-		settings.bind("hide_skip_buttons", "hideSkipButtons", bind(this, this._updateAll));
-		settings.bind("hide_all_buttons", "hideAllButtons", bind(this, this._updateAll));
-		settings.bind("button_text_spacing", "buttonTextSpacing", bind(this, this._updateAll));
-		settings.bind("button_size", "buttonSize", bind(this, this._updateAll));
-
-		// Player settings
-		settings.bind("player_whitelist", "playerWhitelist", bind(this, this._updateAll));
-		settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", bind(this, this._updateAll));
-		settings.bind("poll_interval", "pollInterval", bind(this, this._resetPolling));
-		settings.bind("idle_poll_interval", "idlePollInterval", bind(this, this._resetPolling));
-		settings.bind("empty_values", "emptyValues", bind(this, this._updateAll));
-		settings.bind("debug_mode", "debugMode", bind(this, this._updateAll));
 	},
 
 	_startPolling: function(interval) {
