@@ -1,144 +1,73 @@
 const Desklet = imports.ui.desklet;
-const PopupMenu = imports.ui.popupMenu;
 const St = imports.gi.St;
 const Lang = imports.lang;
-const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
+const GLib = imports.gi.GLib;
 const Settings = imports.ui.settings;
+const Pango = imports.gi.Pango;
+const Soup = imports.gi.Soup;
 
-function MusicDisplayDesklet(metadata, instance_id) {
+function MusicDisplayAdditionsDesklet(metadata, instance_id) {
 	this._init(metadata, instance_id);
 }
 
-MusicDisplayDesklet.prototype = {
+MusicDisplayAdditionsDesklet.prototype = {
 	__proto__: Desklet.Desklet.prototype,
 
-	_init: function(metadata, instance_id) {
+	_init: function (metadata, instance_id) {
 		Desklet.Desklet.prototype._init.call(this, metadata, instance_id);
 		this.metadata = metadata;
-		const basePath = this.metadata.path + "/textures/";
 
-		// Defaults
-		this.line1Format = "%title%";
-		this.line2Format = "%artist%";
-		this.line1Font = "";
-		this.line2Font = "";
-		this.line1Size = 25;
-		this.line2Size = 18;
+		// default props, will be overwritten by settings.bind()
+		this.xSize = 200;
+		this.ySize = 200;
+		this.position = "top_right";
+		this.xOffset = -20;
+		this.yOffset = 20;
+		this.margin = 10;
+		this.margin_color = "white";
+		this.font = "sans 12";
+		this.color = "white";
+		this.textEnabled = true;
+		this.art_enabled = true;
 
-		this.line1_no_player = "No player running";
-		this.line2_no_player = "";
-		this.line1_stopped = "Player %player% is stopped";
-		this.line2_stopped = "";
+		this._currentInterval = null''
 
-		this.hideSkipButtons = false;
-		this.hideAllButtons = false;
-		this.buttonTextSpacing = 7;
-		this.buttonSize = 32;
+		// build container
+		this.container = new St.Widget({ reactive: true });
+		this.setContent(this.container);
 
-		this.playerWhitelist = "rhythmbox,spotify";
-		this.treatWhitelistAsBlacklist = false;
-		this.pollInterval = 1;
-		this.idlePollInterval = 3;
-		this.emptyValues = "Unknown,None,N/A,0"
-		this.debugMode = false;
+		// cover art
+		this.art = new St.Icon({ icon_size: this.xSize });
+		this.container.add_actor(this.art);
 
-		this.btnPlayTexture = basePath + "play.png";
-		this.btnPauseTexture = basePath + "pause.png";
-		this.btnNextTexture = basePath + "next.png";
-		this.btnPrevTexture = basePath + "previous.png";
+		// single time label
+		this.timeLabel = new St.Label({ text: "test", style: "" });
+		this.container.add_actor(this.timeLabel);
 
-		// Track last displayed info
-		this._lastStatus = null;
-		this._lastPlayPauseFile = null;
-		this._lastMetadataDump = null;
-		this._currentPlayer = null;
-
-		// Polling
-		this._currentInterval = null;
-		this._pollTimer = null;
-
-		// Settings
+		// settings binding
 		this.settings = new Settings.DeskletSettings(this, this.metadata.uuid, instance_id);
+		const bind = Lang.bind;
+		this.settings.bind("x_size", "xSize", bind(this, this._updateLayout));
+		this.settings.bind("y_size", "ySize", bind(this, this._updateLayout));
+		this.settings.bind("position", "position", bind(this, this._positionLabel));
+		this.settings.bind("x_offset", "xOffset", bind(this, this._positionLabel));
+		this.settings.bind("y_offset", "yOffset", bind(this, this._positionLabel));
+		this.settings.bind("margin", "margin", bind(this, this._updateLayout));
+		this.settings.bind("margin_color", "margin_color", bind(this, this._updateLayout));
+		this.settings.bind("font", "font", bind(this, this._updateFont));
+		this.settings.bind("color", "color", bind(this, this._updateFont));
+		this.settings.bind("text_enabled", "textEnabled", bind(this, this._updateLabelVisibility));
+		this.settings.bind("art_enabled", "art_enabled", bind(this, this._updateLayout));
+		this.settings.bind("poll_interval", "poll_interval", bind(this, this._resetPolling));
+		this.settings.bind("idlePollInterval", "idlePollInterval", bind(this, this._resetPollingLayout));
 
-		// Layout
-		this.mainBox = new St.BoxLayout({ vertical: false });
-		this.setContent(this.mainBox);
 
-		// Buttons column
-		this.buttonVBox = new St.BoxLayout({ vertical: true });
-		this.mainBox.add_child(this.buttonVBox);
-
-		this.btnPlayPause = new St.Button();
-		this.btnPlayPause.connect('button-press-event', Lang.bind(this, this._onPlayPausePressed));
-		this.buttonVBox.add_child(this.btnPlayPause);
-
-		this.skipHBox = new St.BoxLayout({ vertical: false });
-		this.buttonVBox.add_child(this.skipHBox);
-
-		this.btnPrev = new St.Button();
-		this.btnPrev.connect('button-press-event', Lang.bind(this, this._onPrevPressed));
-		this.skipHBox.add_child(this.btnPrev);
-
-		this.btnNext = new St.Button();
-		this.btnNext.connect('button-press-event', Lang.bind(this, this._onNextPressed));
-		this.skipHBox.add_child(this.btnNext);
-
-		// Spacing widget between buttons and text
-		this.spacingWidget = new St.Widget({ style_class: "spacing-widget", reactive: false });
-		this.mainBox.add_child(this.spacingWidget);
-
-		// Text column
-		this.textVBox = new St.BoxLayout({ vertical: true });
-		this.mainBox.add_child(this.textVBox);
-
-		this.labelTitle = new St.Label({
-		text: "Loading…",
-		x_expand: true,
-		y_expand: true
-		});
-		this.textVBox.add_child(this.labelTitle);
-
-		this.labelArtist = new St.Label({
-		text: "",
-		x_expand: true,
-		y_expand: true
-		});
-		this.textVBox.add_child(this.labelArtist);
-
-		// Context Menu Open Rhythmbox
-		this._menu.addAction(_('Open Rhythmbox'), Lang.bind(this, function () {
-		GLib.spawn_command_line_async(`rhythmbox`);
-		}));
-		this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-		// Context Menu Play/Pause Track
-		this._menu.addAction(_('Play/Pause Track'), Lang.bind(this, function () {
-		GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} play-pause`);
-		this._updateStatus();
-		}));
-		// Context Menu Next Track
-		this._menu.addAction(_('Next Track'), Lang.bind(this, function () {
-		GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} next`);
-		this._updateStatus();
-		}));
-		// Context Menu Previous Track
-		this._menu.addAction(_('Previous Track'), Lang.bind(this, function () {
-		GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} previous`);
-		this._updateStatus();
-		}));
-		// Context Menu Stop Player
-		this._menu.addAction(_('Stop Player'), Lang.bind(this, function () {
-		GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} stop`);
-		this._updateStatus();
-		}));
-
-		// Initial run
-		this._updateAll();
-		this._startPolling(this.idlePollInterval);
-	},
-
-	_checkPlayerctlInstalled: function() {
-	return !!GLib.find_program_in_path("playerctl");
+		// initial setup
+		this._updateLayout();
+		this._updateFont();
+		this._updateLabelVisibility();
+		this._setArt("file:///home/joshua/.cache/rhythmbox/album-art/017");
 	},
 
 	_startPolling: function(interval) {
@@ -158,26 +87,7 @@ MusicDisplayDesklet.prototype = {
 	},
 
 	_resetPolling: function() {
-		const interval = (this._lastStatus && this._lastStatus !== "Stopped")
-			? this.pollInterval
-			: this.idlePollInterval;
-
-		this._startPolling(interval);
-	},
-
-	_updateAll: function() {
-		this._lastStatus = "Reload";
-		this._updateFont();
-		this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
-		this._updateStatus();
-	},
-
-	_updateFont: function() {
-		this.labelTitle.style = `${this.line1Font ? "font-family:" + this.line1Font + ";" : ""} font-size: ${this.line1Size}px;`;
-		this.labelArtist.style = `${this.line2Font ? "font-family:" + this.line2Font + ";" : ""} font-size: ${this.line2Size}px;`;
-		if (this.debugMode) {
-		global.log(`[music-display@nicholasjdi] Update font`);
-		}
+		this._startPolling(pollInterval);
 	},
 
 	_getPlayerctlArgsArray: function() {
@@ -214,220 +124,8 @@ MusicDisplayDesklet.prototype = {
 		}
 	},
 
-	_fetchCustomTagsAsync: function(formatStr, callback) {
-		// Quick check: if it doesn't contain all required chars, return the string as-is
-		if (!formatStr.includes('%') || !formatStr.includes('(') || !formatStr.includes(')') || !formatStr.includes('[') || !formatStr.includes(']')) {
-			callback(formatStr);
-			return;
-		}
-
-		const emptyValues = (this.emptyValues || "").split(",").map(s => s.trim()).filter(Boolean);
-		let result = "";
-		let idx = 0;
-
-		const processNext = () => {
-			if (idx >= formatStr.length) {
-				callback(result);
-				return;
-			}
-
-			let nextPercent = formatStr.indexOf('%', idx);
-			if (nextPercent === -1) {
-				result += formatStr.slice(idx);
-				callback(result);
-				return;
-			}
-
-			// append text before %
-			result += formatStr.slice(idx, nextPercent);
-			idx = nextPercent;
-
-			// parse the full tag (respect parentheses so % inside (...) is ignored)
-			let stack = [];
-			let end = idx + 1;
-			let found = false;
-			while (end < formatStr.length) {
-				if (formatStr[end] === '%' && stack.length === 0) {
-					found = true;
-					break;
-				} else if (formatStr[end] === '(') {
-					stack.push('(');
-				} else if (formatStr[end] === ')') {
-					if (stack.length) stack.pop();
-				}
-				end++;
-			}
-
-			if (!found) {
-				// invalid tag, just append the remaining text
-				result += formatStr.slice(idx);
-				callback(result);
-				return;
-			}
-
-			const tagContent = formatStr.slice(idx + 1, end); // between % and %
-			idx = end + 1; // move past closing %
-
-			// --- Robust prefix/suffix extraction using stack-aware parsing ---
-			let prefix = "", suffix = "", middle = tagContent;
-
-			// Extract prefix if it starts with '(' — find matching ')'
-			if (middle.startsWith('(')) {
-				let depth = 0;
-				for (let i = 0; i < middle.length; i++) {
-					const ch = middle[i];
-					if (ch === '(') depth++;
-					else if (ch === ')') {
-						depth--;
-						if (depth === 0) {
-							prefix = middle.slice(1, i);
-							middle = middle.slice(i + 1);
-							break;
-						}
-					}
-				}
-			}
-
-			// Extract suffix if it ends with ')' — find matching '('
-			if (middle.length && middle[middle.length - 1] === ')') {
-				let depth = 0;
-				for (let j = middle.length - 1; j >= 0; j--) {
-					const ch = middle[j];
-					if (ch === ')') depth++;
-					else if (ch === '(') {
-						depth--;
-						if (depth === 0) {
-							suffix = middle.slice(j + 1, middle.length - 1);
-							middle = middle.slice(0, j);
-							break;
-						}
-					}
-				}
-			}
-
-			// Handle %[player]key% or %[]key%
-			const playerMatch = middle.match(/^\[(.*?)\](.*)$/);
-			let player = "";
-			let metadataKey = "";
-
-			if (playerMatch) {
-				player = playerMatch[1]; // may be empty
-				metadataKey = playerMatch[2];
-			} else {
-				// invalid format, skip tag
-				processNext();
-				return;
-			}
-
-			if (!metadataKey) {
-				// invalid metadata:tag, skip tag
-				processNext();
-				return;
-			}
-
-			// decide which player to use
-			if (player === "") {
-				// user left [ ] empty: use current player from _updateStatus
-				player = this._currentPlayer || null;
-			} else {
-				// user specified a player name — only allow if it matches _currentPlayer
-				if (this._currentPlayer && player !== this._currentPlayer) {
-					// skip this tag entirely, no prefix/suffix
-					processNext();
-					return;
-				}
-			}
-
-			const fetchMetadata = (playerName) => {
-				let args = [];
-				if (playerName) args.push(`--player=${playerName}`);
-				args.push('metadata', metadataKey);
-
-				this._runPlayerctlAsync(args, val => {
-					if (!val || emptyValues.includes(val.trim())) {
-						// invalid metadata, skip processing prefix/suffix
-						processNext();
-						return;
-					}
-
-					// recursively process prefix and suffix
-					this._fetchCustomTagsAsync(prefix, finalPrefix => {
-						this._fetchCustomTagsAsync(suffix, finalSuffix => {
-							result += finalPrefix + val + finalSuffix;
-							processNext();
-						});
-					});
-				});
-			};
-
-			// if player is null (no player yet), try first whitelist player
-			if (!player) {
-				this._runPlayerctlAsync(['-l'], playersOut => {
-					const firstPlayer = playersOut.split("\n").find(p => {
-						if (!p) return false;
-						if (!this.playerWhitelist || !this.playerWhitelist.trim()) return true;
-						const players = this.playerWhitelist.split(",").map(x => x.trim());
-						return this.treatWhitelistAsBlacklist ? !players.includes(p) : players.includes(p);
-					}) || "Player";
-					fetchMetadata(firstPlayer);
-				});
-			} else {
-				fetchMetadata(player);
-			}
-		};
-
-		processNext();
-	},
-
-	_updateText: function(playerName) {
-		const fields = ['xesam:title', 'xesam:artist', 'xesam:album'];
-		const results = {};
-		let pending = fields.length;
-
-		fields.forEach(field => {
-			this._runPlayerctlAsync(['metadata', field], val => {
-				results[field] = val || (field === 'xesam:title' ? "Unknown Title" : field === 'xesam:artist' ? "Unknown Artist" : "Unknown Album");
-				pending--;
-				if (pending === 0) {
-					// all metadata fetched, now build the display text
-					const title = results['xesam:title'];
-					const artist = results['xesam:artist'];
-					const album = results['xesam:album'];
-
-					if (this.debugMode) {
-						global.log(`[music-display@nicholasjdi] Resetting text, ${title}, ${artist}, ${album}, ${playerName}.`);
-					}
-
-					let base1 = this.line1Format
-						.replace('%title%', title)
-						.replace('%artist%', artist)
-						.replace('%album%', album)
-						.replace('%player%', playerName);
-
-					let base2 = this.line2Format
-						.replace('%title%', title)
-						.replace('%artist%', artist)
-						.replace('%album%', album)
-						.replace('%player%', playerName);
-
-					// handle custom tags
-					this._fetchCustomTagsAsync(base1, final1 => {this.labelTitle.set_text(final1);});
-					this._fetchCustomTagsAsync(base2, final2 => {this.labelArtist.set_text(final2);});
-				}
-			});
-		});
-	},
-
 	_updateStatus: function() {
 		try {
-			if (!this._checkPlayerctlInstalled()) {
-				this.labelTitle.set_text("playerctl is not installed");
-				this.labelArtist.set_text("Use command: sudo apt install playerctl");
-				this.buttonVBox.hide();
-				this.spacingWidget.hide();
-				return true;
-			}
-
 			this._runPlayerctlAsync(['status'], statusOut => {
 				const status = statusOut ? statusOut.trim() : "";
 
@@ -536,66 +234,175 @@ MusicDisplayDesklet.prototype = {
 		}
 	},
 
-	_updateButtonTextures: function(isPlaying) {
-		if (this.debugMode) {
-		global.log(`[music-display@nicholasjdi] Update buttons`);
-		}
-		const basePath = this.metadata.path + "/textures/";
-		const playTexture = this.btnPlayTexture || basePath + "play.png";
-		const pauseTexture = this.btnPauseTexture || basePath + "pause.png";
-		const prevTexture = this.btnPrevTexture || basePath + "previous.png";
-		const nextTexture = this.btnNextTexture || basePath + "next.png";
+	// set the text from your code
+	setTimeText: function (text) {
+		this.timeLabel.text = text;
+		this._positionLabel();
+	},
 
-		let playPauseFile = isPlaying ? pauseTexture : playTexture;
-		if (playPauseFile !== this._lastPlayPauseFile || this._lastPlayPauseSize !== this.buttonSize) {
-			this.btnPlayPause.set_child(new St.Icon({
-				gicon: Gio.icon_new_for_string(playPauseFile),
-				icon_size: this.buttonSize
-			}));
-			this.btnPlayPause.height = this.buttonSize;
-			this._lastPlayPauseFile = playPauseFile;
-			this._lastPlayPauseSize = this.buttonSize;
+	_setArt: function(artUrl) {
+		if (!artUrl) {
+			this.art.hide();
+			return;
 		}
 
+		const setArt = (icon) => {
+			this.art.gicon = icon;
+			this.art.icon_size = this.artSize;
+			this.art.show();
+		};
 
-		if (!this.hideSkipButtons && !this.hideAllButtons) {
-			let skipSize = Math.floor(this.buttonSize / 2);
-			this.btnPrev.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(prevTexture), icon_size: skipSize }));
-			this.btnPrev.height = skipSize;
-			this.btnNext.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(nextTexture), icon_size: skipSize }));
-			this.btnNext.height = skipSize;
+		try {
+			if (artUrl.startsWith('file://')) {
+				// normalize local path
+				let localPath = GLib.filename_from_uri(artUrl)[0];
+				setArt(Gio.icon_new_for_string(localPath));
+				return;
+			}
+
+			// download remote art into memory
+			let session = new Soup.SessionAsync();
+			let message = Soup.Message.new('GET', artUrl);
+
+			session.queue_message(message, (session, msg) => {
+				if (msg.status_code !== 200) {
+					log(`[music-display] Failed to download art: ${artUrl}`);
+					this.art.hide();
+					return;
+				}
+
+				try {
+					let bytes = msg.response_body.data;
+					let loader = Gio.MemoryIcon.new(bytes, null);
+					setArt(loader);
+				} catch (e) {
+					log(`[music-display] Error loading art from memory: ${e}`);
+					this.art.hide();
+				}
+			});
+		} catch (e) {
+			log(`[music-display] Error processing art URL: ${e}`);
+			this.art.hide();
 		}
 	},
 
-	_onPlayPausePressed: function(actor, event) {
-		if (event.get_button() === 1) {
-			GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} play-pause`);
-			this._updateStatus();
+	_updateLayout: function () {
+		// set container size
+		this.container.width = this.xSize;
+		this.container.height = this.ySize;
+
+		// show margin_color only if art is enabled AND art is visible
+		if (this.art_enabled && this.art.visible && this.margin > 0) {
+			this.container.style = `background-color: ${this.margin_color};`;
+		} else {
+			this.container.style = ""; // no background
 		}
+
+		// size and center art inside margins
+		if (this.art_enabled) {
+			const artSize = Math.min(this.xSize - 2 * this.margin, this.ySize - 2 * this.margin);
+			this.art.icon_size = artSize;
+			const artX = Math.round((this.xSize - artSize) / 2);
+			const artY = Math.round((this.ySize - artSize) / 2);
+			this.art.set_position(artX, artY);
+			this.art.show();
+		} else {
+			this.art.hide();
+		}
+
+		this._positionLabel();
 	},
 
-	_onPrevPressed: function(actor, event) {
-		if (event.get_button() === 1) {
-			GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} previous`);
-			this._updateStatus();
-		}
+	_updateFont: function () {
+		// parse the font string from the settings
+		let desc = Pango.font_description_from_string(this.font);
+
+		// get family
+		let family = desc.get_family();
+		// get size in points
+		let size = desc.get_size() / Pango.SCALE; // Pango stores size*Pango.SCALE
+		// get weight and style
+		let weight = desc.get_weight(); // e.g. 400, 700 etc.
+		let style = desc.get_style();   // 0 = normal, 1 = oblique, 2 = italic
+
+		// turn weight/style into CSS-friendly strings
+		let weightStr = (weight >= Pango.Weight.BOLD) ? 'bold' : 'normal';
+		let styleStr = (style === Pango.Style.ITALIC) ? 'italic'
+						: (style === Pango.Style.OBLIQUE) ? 'oblique' : 'normal';
+
+		// now build a style string for St.Label
+		this.timeLabel.style =
+			'font-family: ' + family + '; ' +
+			'font-weight: ' + weightStr + '; ' +
+			'font-style: ' + styleStr + '; ' +
+			'font-size: ' + size + 'pt; ' +
+			'color: ' + this.color + ';';
+
+		this._positionLabel();
 	},
 
-	_onNextPressed: function(actor, event) {
-		if (event.get_button() === 1) {
-			GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} next`);
-			this._updateStatus();
-		}
+	_updateLabelVisibility: function () {
+		if (this.textEnabled) this.timeLabel.show();
+		else this.timeLabel.hide();
+		this._positionLabel();
 	},
 
-	on_desklet_removed: function() {
-		if (this._pollId) {
-			GLib.source_remove(this._pollId);
-			this._pollId = null;
+	_positionLabel: function () {
+		// run on idle so label size is known
+		if (this._posTimeout) {
+			try { GLib.source_remove(this._posTimeout); } catch (e) {}
+		}
+		this._posTimeout = GLib.timeout_add(
+			GLib.PRIORITY_DEFAULT_IDLE,
+			0,
+			Lang.bind(this, function () {
+				this._posTimeout = null;
+
+				const labelW = this.timeLabel.get_width();
+				const labelH = this.timeLabel.get_height();
+				const dsW = this.container.width;
+				const dsH = this.container.height;
+				const m = this.margin;
+
+				let anchorX = 0, anchorY = 0;
+				switch (this.position) {
+					case "top_left":	 anchorX = m;		 anchorY = m;		 break;
+					case "top_right":	 anchorX = dsW - m;	 anchorY = m;		 break;
+					case "bottom_left":  anchorX = m;		 anchorY = dsH - m;	 break;
+					case "bottom_right": anchorX = dsW - m;	 anchorY = dsH - m;	 break;
+					case "center":		 anchorX = dsW / 2;	 anchorY = dsH / 2;	 break;
+					default:			 anchorX = dsW - m;	 anchorY = m;		 break;
+				}
+
+				let leftX, topY;
+				if (this.position.endsWith("_left"))
+					leftX = anchorX + this.xOffset;
+				else if (this.position.endsWith("_right"))
+					leftX = anchorX - labelW + this.xOffset;
+				else
+					leftX = anchorX - Math.round(labelW / 2) + this.xOffset;
+
+				if (this.position.startsWith("top"))
+					topY = anchorY + this.yOffset;
+				else if (this.position.startsWith("bottom"))
+					topY = anchorY - labelH + this.yOffset;
+				else
+					topY = anchorY - Math.round(labelH / 2) + this.yOffset;
+
+				this.timeLabel.set_position(Math.round(leftX), Math.round(topY));
+				return false;
+			})
+		);
+	},
+
+	on_desklet_removed: function () {
+		if (this._posTimeout) {
+			try { GLib.source_remove(this._posTimeout); } catch (e) {}
+			this._posTimeout = null;
 		}
 	}
 };
 
 function main(metadata, instance_id) {
-	return new MusicDisplayDesklet(metadata, instance_id);
+	return new MusicDisplayAdditionsDesklet(metadata, instance_id);
 }
