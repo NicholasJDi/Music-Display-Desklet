@@ -8,7 +8,7 @@
         "description": "X Size (pixels)",
         "default": 200,
         "min": 10,
-        "max": 400,
+        "max": 1000,
         "step": 10,
         "tooltip": "The X Size of the Desklet"
     },
@@ -17,7 +17,7 @@
         "description": "Y Size (pixels)",
         "default": 200,
         "min": 10,
-        "max": 400,
+        "max": 1000,
         "step": 10,
         "tooltip": "The size of the Margin around Art"
     },
@@ -34,12 +34,19 @@
         "type": "entry",
         "description": "Format",
         "default": "%time%",
-        "tooltip": "%time%, %position%, %length%"
+        "tooltip": "%time|(modifier)%, %position|(modifier)%, %length|(modifier)%.\nModifiers include:\n0:00 = 0:01-1:17:03\n00:00 = 00:01-1:17:03\n00 = 1-1:17:03\n0:0 = Adaptive to song length from other modifiers above\n0 = 1-1:17:3\n(default is 0:00)"
     },
     "font": {
         "type": "fontchooser",
         "description": "Font",
-        "default": "sans 12"
+        "default": "sans 12",
+        "tooltip": "Text Font"
+    },
+    "color" : {
+        "type": "colorchooser",
+        "description": "Color",
+        "default": "white",
+        "tooltip": "Text Color"
     },
     "position": {
         "type": "combobox",
@@ -97,12 +104,19 @@
         "tooltip": "The Color of the Margin around Art",
         "dependency": "margin>0"
     },
+    "overrides_enabled":{
+        "type": "checkbox",
+        "description": "Overrides Enabled",
+        "default": false,
+        "tooltip": "Per Track Art Overrides"
+    },
     "art_dir" : {
         "type": "filechooser",
         "description": "Art Override Directory",
         "default": "",
         "tooltip": "The Directory to fetch Art Overrides from,\nFiles are formmated as \"(Artist) - (Title).png\" so \"Lemmino - Cipher.png\" for example.",
-        "select-dir" : true
+        "select-dir" : true,
+        "dependency": "overrides_enabled"
     },
     "head4": {
         "type": "header",
