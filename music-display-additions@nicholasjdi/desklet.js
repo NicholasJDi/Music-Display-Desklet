@@ -29,13 +29,24 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.font = "sans 12";
 		this.color = "white";
 		this.textEnabled = true;
-		this.art_enabled = true;
+		this.artEnabled = true;
+		this.pollInterval = 1;
+		this.idlePollInterval = 3;
+		this.playerWhitelist = "rhythmbox,spotify";
+		this.treatWhitelistAsBlacklist = false;
+		this.debugMode = false;
 
-		this._currentInterval = null''
+		this._hideArt = false;
+		this._artSize = null;
+		this._currentInterval = null;
 
 		// build container
 		this.container = new St.Widget({ reactive: true });
 		this.setContent(this.container);
+
+		// backdrop behind art
+		this.backdrop = new St.Widget({ reactive: true});
+		this.container.add_actor(this.backdrop);
 
 		// cover art
 		this.art = new St.Icon({ icon_size: this.xSize });
@@ -57,17 +68,19 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.settings.bind("margin_color", "margin_color", bind(this, this._updateLayout));
 		this.settings.bind("font", "font", bind(this, this._updateFont));
 		this.settings.bind("color", "color", bind(this, this._updateFont));
-		this.settings.bind("text_enabled", "textEnabled", bind(this, this._updateLabelVisibility));
-		this.settings.bind("art_enabled", "art_enabled", bind(this, this._updateLayout));
-		this.settings.bind("poll_interval", "poll_interval", bind(this, this._resetPolling));
-		this.settings.bind("idlePollInterval", "idlePollInterval", bind(this, this._resetPollingLayout));
-
+		this.settings.bind("text_enabled", "textEnabled", bind(this, this._positionLabel));
+		this.settings.bind("art_enabled", "artEnabled", bind(this, this._updateLayout));
+		this.settings.bind("poll_interval", "pollInterval", bind(this, this._resetPolling));
+		this.settings.bind("idle_poll_interval", "idlePollInterval", bind(this, this._resetPolling));
+		this.settings.bind("player_whitelist", "playerWhitelist", bind(this, this._updateStatus));
+		this.settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", bind(this, this._updateStatus));
+		this.settings.bind("debug_mode", "debugMode", null);
 
 		// initial setup
 		this._updateLayout();
 		this._updateFont();
-		this._updateLabelVisibility();
-		this._setArt("file:///home/joshua/.cache/rhythmbox/album-art/017");
+		this._positionLabel();
+		this._setArt("file:///home/joshua/.cache/rhythmbox/album-art/./047");
 	},
 
 	_startPolling: function(interval) {
@@ -87,7 +100,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 	},
 
 	_resetPolling: function() {
-		this._startPolling(pollInterval);
+		this._startPolling(this.pollInterval);
 	},
 
 	_getPlayerctlArgsArray: function() {
@@ -238,51 +251,104 @@ MusicDisplayAdditionsDesklet.prototype = {
 	setTimeText: function (text) {
 		this.timeLabel.text = text;
 		this._positionLabel();
+		if (this.debugMode) {
+			global.log(`[music-display@nicholasjdi] set time text to ${text}`);
+		}
 	},
 
 	_setArt: function(artUrl) {
-		if (!artUrl) {
-			this.art.hide();
-			return;
-		}
-
-		const setArt = (icon) => {
-			this.art.gicon = icon;
-			this.art.icon_size = this.artSize;
-			this.art.show();
-		};
-
 		try {
-			if (artUrl.startsWith('file://')) {
-				// normalize local path
-				let localPath = GLib.filename_from_uri(artUrl)[0];
-				setArt(Gio.icon_new_for_string(localPath));
+			if (!artUrl || artUrl === "") {
+				this._hideArt = true;
+				return;
+			}
+			this._artSize = Math.min(this.xSize - 2 * this.margin, this.ySize - 2 * this.margin);
+			if (artUrl.startsWith("https://")) {
+				if (this.debugMode) {
+					global.log(`[music-display@nicholasjdi] parsing art from url: ${artUrl}`);
+				}
+				this._loadArtFromUrl(artUrl);
+			} else {
+				if (this.debugMode) {
+					global.log(`[music-display@nicholasjdi] parsing art from file: ${artUrl}`);
+				}
+				this._loadArtFromFile(artUrl);
+			}
+ 		} finally {
+			this._updateLayout();
+		}
+	},
+
+	_loadArtFromFile: function(artPath) {
+		try {
+			if (!artPath) {
+				this._hideArt = true;
 				return;
 			}
 
-			// download remote art into memory
-			let session = new Soup.SessionAsync();
+			// Normalize path
+			let localPath = artPath.replace("file://", "");
+			if (!GLib.file_test(localPath, GLib.FileTest.EXISTS)) {
+				global.logWarning(`[music-display@nicholasjdi] File does not exist: ${localPath}`);
+				this._hideArt = true;
+				return;
+			}
+
+			// Set icon size first
+			this.art.icon_size = this._artSize || 200;
+
+			// Load file
+			let file = Gio.File.new_for_path(localPath);
+			let fileIcon = new Gio.FileIcon({ file: file });
+			this.art.set_gicon(fileIcon);
+			this.art.show();
+
+			if (this.debugMode) global.log(`[music-display@nicholasjdi] loaded art from file: ${localPath}`);
+		} catch (e) {
+			global.logWarning(`[music-display@nicholasjdi] Could not load art from file: ${artPath}, Error: ${e.message}`);
+			this._hideArt = true;
+		}
+	},
+
+
+	_loadArtFromUrl: function (artUrl) {
+		try {
+			// Create session (no Async suffix in libSoup 3)
+			let session = new Soup.Session();
+
+			// Build GET message
 			let message = Soup.Message.new('GET', artUrl);
 
-			session.queue_message(message, (session, msg) => {
-				if (msg.status_code !== 200) {
-					log(`[music-display] Failed to download art: ${artUrl}`);
-					this.art.hide();
-					return;
-				}
-
+			// Send asynchronously
+			session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null, (sess, res) => {
 				try {
-					let bytes = msg.response_body.data;
-					let loader = Gio.MemoryIcon.new(bytes, null);
-					setArt(loader);
+					// Get bytes from response
+					let bytes = session.send_and_read_finish(res);
+					// Check status code
+					if (message.get_status() !== Soup.Status.OK) {
+						global.logWarning(`[music-display@nicholasjdi] Failed to download image: ${artUrl} status ${message.get_status()}`);
+						this._hideArt = true;
+						return;
+					}
+
+					// Save to temp file
+					let tmpPath = GLib.build_filenamev([GLib.get_tmp_dir(), 'music_display_art.png']);
+					GLib.file_set_contents(tmpPath, bytes.get_data());
+
+					if (this.debugMode) {
+						global.log(`[music-display@nicholasjdi] grabbed art from url: ${artUrl}`);
+					}
+
+					// Load it as local file
+					this._loadArtFromFile(tmpPath);
 				} catch (e) {
-					log(`[music-display] Error loading art from memory: ${e}`);
-					this.art.hide();
+					global.logWarning(`[music-display@nicholasjdi] Error reading response: ${e.message}`);
+					this._hideArt = true;
 				}
 			});
 		} catch (e) {
-			log(`[music-display] Error processing art URL: ${e}`);
-			this.art.hide();
+			global.logWarning(`[music-display@nicholasjdi] Could not load art from URL: ${artUrl}, Error: ${e.message}`);
+			this._hideArt = true;
 		}
 	},
 
@@ -291,23 +357,20 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.container.width = this.xSize;
 		this.container.height = this.ySize;
 
-		// show margin_color only if art is enabled AND art is visible
-		if (this.art_enabled && this.art.visible && this.margin > 0) {
-			this.container.style = `background-color: ${this.margin_color};`;
-		} else {
-			this.container.style = ""; // no background
-		}
-
-		// size and center art inside margins
-		if (this.art_enabled) {
-			const artSize = Math.min(this.xSize - 2 * this.margin, this.ySize - 2 * this.margin);
-			this.art.icon_size = artSize;
-			const artX = Math.round((this.xSize - artSize) / 2);
-			const artY = Math.round((this.ySize - artSize) / 2);
-			this.art.set_position(artX, artY);
+		if (this.artEnabled && !this._hideArt) {
+			this._artSize = Math.min(this.xSize - 2 * this.margin, this.ySize - 2 * this.margin);
+			this.art.icon_size = this._artSize;
+			this.art.set_position(this.margin, this.margin);
+			this.backdrop.set_position(this.margin, this.margin);
+			this.backdrop.style = `background-color: black; width: ${this._artSize}px; height: ${this._artSize}px;`;
 			this.art.show();
+			if (this.margin > 0) this.container.style = `background-color: ${this.margin_color};`;
+			else this.container.style = ``
 		} else {
 			this.art.hide();
+			this._hideArt = true;
+			this.container.style = "";
+			this.backdrop.style = "";
 		}
 
 		this._positionLabel();
@@ -323,7 +386,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		let size = desc.get_size() / Pango.SCALE; // Pango stores size*Pango.SCALE
 		// get weight and style
 		let weight = desc.get_weight(); // e.g. 400, 700 etc.
-		let style = desc.get_style();   // 0 = normal, 1 = oblique, 2 = italic
+		let style = desc.get_style();	// 0 = normal, 1 = oblique, 2 = italic
 
 		// turn weight/style into CSS-friendly strings
 		let weightStr = (weight >= Pango.Weight.BOLD) ? 'bold' : 'normal';
@@ -341,22 +404,22 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this._positionLabel();
 	},
 
-	_updateLabelVisibility: function () {
-		if (this.textEnabled) this.timeLabel.show();
-		else this.timeLabel.hide();
-		this._positionLabel();
-	},
-
 	_positionLabel: function () {
 		// run on idle so label size is known
 		if (this._posTimeout) {
 			try { GLib.source_remove(this._posTimeout); } catch (e) {}
 		}
 		this._posTimeout = GLib.timeout_add(
-			GLib.PRIORITY_DEFAULT_IDLE,
+			GLib.PRIORITY_DEFAULT,
 			0,
 			Lang.bind(this, function () {
 				this._posTimeout = null;
+
+				if (this.textEnabled) this.timeLabel.show();
+				else {
+				this.timeLabel.hide();
+				return;
+				}
 
 				const labelW = this.timeLabel.get_width();
 				const labelH = this.timeLabel.get_height();
