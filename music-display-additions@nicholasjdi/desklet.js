@@ -37,6 +37,8 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.playerWhitelist = "rhythmbox,spotify";
 		this.treatWhitelistAsBlacklist = false;
 		this.debugMode = false;
+		this.overridesEnabled = false;
+		this.overridesDirectory = "";
 
 		this._hideArt = false;
 		this._artSize = null;
@@ -81,12 +83,14 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.settings.bind("player_whitelist", "playerWhitelist", bind(this, this._updateStatus));
 		this.settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", bind(this, this._updateStatus));
 		this.settings.bind("debug_mode", "debugMode", null);
+		this.settings.bind("overrides_enabled", "overridesEnabled", bind(this, this._updateArt));
+		this.settings.bind("art_dir", "overridesDirectory", bind(this, this._updateArt));
 
 		// initial setup
 		this._updateLayout();
+		this._updateArt();
 		this._updateFont();
 		this._updateTime();
-		this._updateArt();
 		this._startPolling(this.pollInterval);
 	},
 
@@ -248,7 +252,31 @@ MusicDisplayAdditionsDesklet.prototype = {
 	_updateArt: function () {
 		try {
 			this._runPlayerctlAsync(['metadata', "mpris:artUrl"], artUrlOut => {
-				this._setArt(artUrlOut);
+				let artUrl = artUrlOut;
+
+            	// If overrides are enabled, try to find a local override image
+            	if (this.overridesEnabled && this.overridesDirectory) {
+            	    // to build your own file name pattern.
+            	    this._runPlayerctlAsync(['metadata', 'xesam:artist'], artist => {
+            	        this._runPlayerctlAsync(['metadata', 'xesam:title'], title => {
+            	            let safeArtist = (artist || 'unknown').replace(/[/\\?%*:|"<>]/g, '_');
+            	            let safeTitle = (title || 'unknown').replace(/[/\\?%*:|"<>]/g, '_');
+			
+            	            const exts = ['png','jpg','jpeg','webp'];
+							for (let ext of exts) {
+							    let candidate = GLib.build_filenamev([this.overridesDirectory, `${safeArtist} - ${safeTitle}.${ext}`]);
+							    if (GLib.file_test(candidate.replace("file://",""), GLib.FileTest.EXISTS)) {
+							        artUrl = candidate;
+									if (this.debugMode) {
+										global.log(`[music-display@nicholasjdi] grabbed override art from ${artUrl}`);
+									}
+									break;
+								}
+							}
+							this._setArt(artUrl);
+            	        });
+            	    });
+            	} else this._setArt(artUrl);
 			});
 		} catch (e) {
 			global.logError(`[music-display-additions@nicholasjdi] _updateArt exception: ${e}`);
@@ -371,7 +399,8 @@ MusicDisplayAdditionsDesklet.prototype = {
 			this.art.icon_size = this._artSize;
 			this.art.set_position(this.margin, this.margin);
 			this.backdrop.set_position(this.margin, this.margin);
-			this.backdrop.style = `background-color: ${this.backgroundColor}; width: ${this._artSize}px; height: ${this._artSize}px;`;
+			this.backdrop.style = `background-color: ${this.backgroundColor};`;
+			this.backdrop.set_size(this._artSize, this._artSize)
 			this.art.show();
 			if (this.margin > 0) this.container.style = `background-color: ${this.marginColor};`;
 			else this.container.style = ``
@@ -468,11 +497,16 @@ MusicDisplayAdditionsDesklet.prototype = {
 	},
 
 	on_desklet_removed: function () {
-		if (this._posTimeout) {
-			try { GLib.source_remove(this._posTimeout); } catch (e) {}
-			this._posTimeout = null;
-		}
+	    if (this._posTimeout) {
+	        GLib.source_remove(this._posTimeout);
+	        this._posTimeout = null;
+	    }
+	    if (this._pollTimer) {
+	        GLib.source_remove(this._pollTimer);
+	        this._pollTimer = null;
+	    }
 	}
+
 };
 
 function main(metadata, instance_id) {
