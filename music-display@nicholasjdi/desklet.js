@@ -202,7 +202,7 @@ MusicDisplayDesklet.prototype = {
 	},
 
 	_resetPolling: function() {
-		this._startPolling(pollInterval);
+		this._startPolling(this.pollInterval);
 	},
 
 	_updateAll: function() {
@@ -534,14 +534,12 @@ MusicDisplayDesklet.prototype = {
 							const dump = metadataDump || "";
 
 							const metadataChanged = (dump !== this._lastMetadataDump);
+							this._lastMetadataDump = dump;
 
 							if (statusChanged || metadataChanged) {
 								if (this.debugMode) {
 									global.log(`[music-display@nicholasjdi] update triggered (statusChanged=${statusChanged}, metadataChanged=${metadataChanged})`);
 								}
-
-								// store new metadata dump and status
-								this._lastMetadataDump = dump;
 
 								// Now update text/buttons
 								this._updateText(firstPlayer);
