@@ -25,12 +25,14 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.xOffset = -20;
 		this.yOffset = 20;
 		this.margin = 10;
-		this.margin_color = "white";
+		this.marginColor = "white";
+		this.backgroundColor = "black";
+		this.timeFormat = "%time%";
 		this.font = "sans 12";
 		this.color = "white";
 		this.textEnabled = true;
 		this.artEnabled = true;
-		this.pollInterval = 1;
+		this.pollInterval = 0.5;
 		this.idlePollInterval = 3;
 		this.playerWhitelist = "rhythmbox,spotify";
 		this.treatWhitelistAsBlacklist = false;
@@ -39,6 +41,8 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this._hideArt = false;
 		this._artSize = null;
 		this._currentInterval = null;
+		this._lastMetadataDump = null;
+		this._lastStatus = null;
 
 		// build container
 		this.container = new St.Widget({ reactive: true });
@@ -65,11 +69,13 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.settings.bind("x_offset", "xOffset", bind(this, this._positionLabel));
 		this.settings.bind("y_offset", "yOffset", bind(this, this._positionLabel));
 		this.settings.bind("margin", "margin", bind(this, this._updateLayout));
-		this.settings.bind("margin_color", "margin_color", bind(this, this._updateLayout));
+		this.settings.bind("margin_color", "marginColor", bind(this, this._updateLayout));
+		this.settings.bind("background_color", "backgroundColor", bind(this, this._updateLayout));
+		this.settings.bind("format", "timeFormat", bind(this, this._updateTime));
 		this.settings.bind("font", "font", bind(this, this._updateFont));
 		this.settings.bind("color", "color", bind(this, this._updateFont));
-		this.settings.bind("text_enabled", "textEnabled", bind(this, this._positionLabel));
-		this.settings.bind("art_enabled", "artEnabled", bind(this, this._updateLayout));
+		this.settings.bind("text_enabled", "textEnabled", bind(this, this._updateTime));
+		this.settings.bind("art_enabled", "artEnabled", bind(this, this._updateArt));
 		this.settings.bind("poll_interval", "pollInterval", bind(this, this._resetPolling));
 		this.settings.bind("idle_poll_interval", "idlePollInterval", bind(this, this._resetPolling));
 		this.settings.bind("player_whitelist", "playerWhitelist", bind(this, this._updateStatus));
@@ -79,8 +85,9 @@ MusicDisplayAdditionsDesklet.prototype = {
 		// initial setup
 		this._updateLayout();
 		this._updateFont();
-		this._positionLabel();
-		this._setArt("file:///home/joshua/.cache/rhythmbox/album-art/./047");
+		this._updateTime();
+		this._updateArt();
+		this._startPolling(this.pollInterval);
 	},
 
 	_startPolling: function(interval) {
@@ -137,7 +144,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		}
 	},
 
-	_updateStatus: function() {
+	_updateStatus: function () {
 		try {
 			this._runPlayerctlAsync(['status'], statusOut => {
 				const status = statusOut ? statusOut.trim() : "";
@@ -154,112 +161,100 @@ MusicDisplayAdditionsDesklet.prototype = {
 				const statusChanged = (status !== this._lastStatus);
 				this._lastStatus = status;
 
-				let showButtons = true;
-
-				if (!status) {
-					// No player
-					this.labelTitle.set_text(this.line1_no_player);
-					this.labelArtist.set_text(this.line2_no_player);
-					showButtons = false;
-				} else if (status === "Stopped") {
-					// Player stopped
-					this._runPlayerctlAsync(['-l'], playersOut => {
-						let firstPlayer = (playersOut || "").split("\n")[0] || "Player";
-						this.labelTitle.set_text(this.line1_stopped.replace('%player%', firstPlayer));
-						this.labelArtist.set_text(this.line2_stopped.replace('%player%', firstPlayer));
-					});
-					showButtons = false;
+				if (!status || status === "Stopped") {
+					// No Player / Stopped
+					this._setTimeText("");
+					this._setArt("");
 				} else {
 					// Playing / Paused
-					this._runPlayerctlAsync(['-l'], playersOut => {
-						// build clean array of reported players
-						const playersList = (playersOut || "").split("\n").map(s => s && s.trim()).filter(Boolean);
+					this._runPlayerctlAsync(['metadata'], metadataDump => {
+						const dump = metadataDump || "";
 
-						const whitelist = (this.playerWhitelist || "").split(",").map(x => x.trim()).filter(Boolean);
+						const metadataChanged = (dump !== this._lastMetadataDump);
+						this._lastMetadataDump = dump;
 
-						// choose a reported entry where the base name (before '.') matches whitelist (or any if whitelist empty)
-						const pick = playersList.find(p => {
-							if (!p) return false;
-							const base = p.split(".")[0];				 // normalize reported name
-							if (!whitelist.length) return true;			 // no whitelist => accept first valid
-							return this.treatWhitelistAsBlacklist
-								? !whitelist.includes(base)
-								: whitelist.includes(base);
-						}) || null; // null means no concrete pick
+						// Update time
+						if (this.textEnabled) this._updateTime();
+						else this._setTimeText("");
 
-						// normalise to base name (e.g. firefox.12345 -> firefox)
-						const firstPlayer = pick ? pick.split(".")[0] : "Player";
-
-						// store normalized current player for tag checks
-						this._currentPlayer = firstPlayer;
-
-						// Build metadata args. If we have a concrete pick (e.g. firefox.12345),
-						// pass --player=pick so it overrides any whitelist flags (playerctl respects the rightmost --player=).
-						const metaArgs = [];
-						if (pick) metaArgs.push(`--player=${pick}`);
-						metaArgs.push('metadata');
-
-						// Fetch full metadata dump and compare to last dump
-						this._runPlayerctlAsync(metaArgs, metadataDump => {
-							const dump = metadataDump || "";
-
-							const metadataChanged = (dump !== this._lastMetadataDump);
-
-							if (statusChanged || metadataChanged) {
-								if (this.debugMode) {
-									global.log(`[music-display@nicholasjdi] update triggered (statusChanged=${statusChanged}, metadataChanged=${metadataChanged})`);
-								}
-
-								// store new metadata dump and status
-								this._lastMetadataDump = dump;
-
-								// Now update text/buttons
-								this._updateText(firstPlayer);
-								const isPlaying = (status === "Playing");
-								this._updateButtonTextures(isPlaying);
-							} else {
-								if (this.debugMode) {
-									global.log(`[music-display@nicholasjdi] no change in metadata/status, skipping update`);
-								}
+						if (statusChanged || metadataChanged) {
+							if (this.debugMode) {
+								global.log(`[music-display-additions@nicholasjdi] art update triggered (statusChanged=${statusChanged}, metadataChanged=${metadataChanged})`);
 							}
-						});
-					});
-				}
 
-				// Buttons / spacing (visibility is independent of whether we updated text)
-				if (!showButtons || this.hideAllButtons) {
-					this.buttonVBox.hide();
-					this.spacingWidget.hide();
-				} else {
-					this.buttonVBox.show();
-					this.spacingWidget.show();
-					this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
-					this.hideSkipButtons ? this.skipHBox.hide() : this.skipHBox.show();
+							// Update art
+							if (this.artEnabled) this._updateArt();
+							else this._setArt("");
+						} else {
+							if (this.debugMode) {
+								global.log(`[music-display-additions@nicholasjdi] no change in metadata/status, skipping art update`);
+							}
+						}
+					});
 				}
 			});
 		} catch (e) {
-			global.logError(`[music-display@nicholasjdi] _updateStatus exception: ${e}`);
+			global.logError(`[music-display-additions@nicholasjdi] _updateStatus exception: ${e}`);
 		} finally {
 			if (this.debugMode) {
-				global.log(`[music-display@nicholasjdi] polling every ${this._currentInterval}s`);
+				global.log(`[music-display-additions@nicholasjdi] polling every ${this._currentInterval}s`);
 			}
 			return true
 		}
 	},
 
-	// set the text from your code
-	setTimeText: function (text) {
-		this.timeLabel.text = text;
-		this._positionLabel();
-		if (this.debugMode) {
-			global.log(`[music-display@nicholasjdi] set time text to ${text}`);
+	_updateTime: function () {
+		try {
+			this._runPlayerctlAsync(['position'], timeOut => {
+				this._runPlayerctlAsync(['metadata', 'mpris:length'], lengthOut => {
+					lengthOut = lengthOut / 1000000
+					const timeSeconds = Math.floor(timeOut);
+					const timeMinutes = Math.floor(timeOut / 60);
+					const timeHours = Math.floor(timeOut / 3600);
+					const lengthSeconds = Math.floor(lengthOut);
+					const lengthMinutes = Math.floor(lengthOut / 60);
+					const lengthHours = Math.floor(lengthOut / 3600);
+					// GOOD LORD THIS IS SO UNREADABLE
+					// %time%
+					let timeText = this.timeFormat.replace(`%time%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : "0:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : "0:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
+					timeText = timeText.replace(`%time|0:00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : "0:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : "0:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
+					timeText = timeText.replace(`%time|00:00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : "00:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : "00:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
+					timeText = timeText.replace(`%time|00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : ""}${timeSeconds > 0 ? (timeMinutes > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : (timeSeconds % 60).toString()) : "0"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : (lengthSeconds % 60).toString()) : "0"}`);
+					timeText = timeText.replace(`%time|0%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeMinutes % 60).toString() + ":" : ""}${timeSeconds > 0 ? (timeSeconds % 60).toString() : "0"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthMinutes % 60).toString() + ":" : ""}${lengthSeconds > 0 ? (lengthSeconds % 60).toString() : "0"}`);
+					timeText = timeText.replace(`%time|0:0%`,`${lengthHours > 0 ? timeHours.toString().padStart(lengthHours.toString().length,"0") + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString().padStart((lengthMinutes % 60).toString().length,"0") + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : (timeSeconds % 60).toString().padStart((lengthSeconds % 60).toString().length,"0")) : "0"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : (lengthSeconds % 60).toString()) : "0"}`);
+
+
+					this._setTimeText(timeText);
+				});
+			});
+		} catch (e) {
+			global.logError(`[music-display-additions@nicholasjdi] _updateTime exception: ${e}`);
 		}
 	},
 
-	_setArt: function(artUrl) {
+	_updateArt: function () {
+		try {
+			this._runPlayerctlAsync(['metadata', "mpris:artUrl"], artUrlOut => {
+				this._setArt(artUrlOut);
+			});
+		} catch (e) {
+			global.logError(`[music-display-additions@nicholasjdi] _updateArt exception: ${e}`);
+		}
+	},
+
+	_setTimeText: function(text) {
+		if (this.debugMode) {
+			global.log(`[music-display@nicholasjdi] setting time text to ${text}`);
+		}
+		this.timeLabel.set_text(text);
+		this._positionLabel();
+	},
+
+	_setArt: function (artUrl) {
 		try {
 			if (!artUrl || artUrl === "") {
 				this._hideArt = true;
+				this._updateLayout();
 				return;
 			}
 			this._artSize = Math.min(this.xSize - 2 * this.margin, this.ySize - 2 * this.margin);
@@ -274,15 +269,14 @@ MusicDisplayAdditionsDesklet.prototype = {
 				}
 				this._loadArtFromFile(artUrl);
 			}
- 		} finally {
-			this._updateLayout();
-		}
+ 		} finally {if (this._hideArt) this._updateLayout();}
 	},
 
-	_loadArtFromFile: function(artPath) {
+	_loadArtFromFile: function (artPath) {
 		try {
 			if (!artPath) {
 				this._hideArt = true;
+				this._updateLayout();
 				return;
 			}
 
@@ -307,6 +301,8 @@ MusicDisplayAdditionsDesklet.prototype = {
 		} catch (e) {
 			global.logWarning(`[music-display@nicholasjdi] Could not load art from file: ${artPath}, Error: ${e.message}`);
 			this._hideArt = true;
+		} finally {
+			this._updateLayout();
 		}
 	},
 
@@ -349,7 +345,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		} catch (e) {
 			global.logWarning(`[music-display@nicholasjdi] Could not load art from URL: ${artUrl}, Error: ${e.message}`);
 			this._hideArt = true;
-		}
+		} finally {if (this._hideArt) this._updateLayout();}
 	},
 
 	_updateLayout: function () {
@@ -362,13 +358,13 @@ MusicDisplayAdditionsDesklet.prototype = {
 			this.art.icon_size = this._artSize;
 			this.art.set_position(this.margin, this.margin);
 			this.backdrop.set_position(this.margin, this.margin);
-			this.backdrop.style = `background-color: black; width: ${this._artSize}px; height: ${this._artSize}px;`;
+			this.backdrop.style = `background-color: ${this.backgroundColor}; width: ${this._artSize}px; height: ${this._artSize}px;`;
 			this.art.show();
-			if (this.margin > 0) this.container.style = `background-color: ${this.margin_color};`;
+			if (this.margin > 0) this.container.style = `background-color: ${this.marginColor};`;
 			else this.container.style = ``
 		} else {
 			this.art.hide();
-			this._hideArt = true;
+			this._hideArt = false;
 			this.container.style = "";
 			this.backdrop.style = "";
 		}
@@ -410,7 +406,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 			try { GLib.source_remove(this._posTimeout); } catch (e) {}
 		}
 		this._posTimeout = GLib.timeout_add(
-			GLib.PRIORITY_DEFAULT,
+			GLib.PRIORITY_DEFAULT_IDLE,
 			0,
 			Lang.bind(this, function () {
 				this._posTimeout = null;
