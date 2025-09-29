@@ -103,14 +103,14 @@
         "step": 1,
         "tooltip": "The size of the Margin around Art"
     },
-    "margin_color" : {
+    "margin_color": {
         "type": "colorchooser",
         "description": "Margin Color",
         "default": "white",
         "tooltip": "The Color of the Margin around Art",
         "dependency": "margin>0"
     },
-    "background_color" : {
+    "background_color": {
         "type": "colorchooser",
         "description": "Background Color",
         "default": "black",
@@ -122,7 +122,7 @@
         "default": false,
         "tooltip": "Per Track Art Overrides"
     },
-    "art_dir" : {
+    "art_dir": {
         "type": "filechooser",
         "description": "Art Override Directory",
         "default": "",

@@ -39,12 +39,14 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.debugMode = false;
 		this.overridesEnabled = false;
 		this.overridesDirectory = "";
+		this.disabled = false;
 
 		this._hideArt = false;
 		this._artSize = null;
 		this._currentInterval = null;
 		this._lastMetadataDump = null;
 		this._lastStatus = null;
+		this._soupSession = new Soup.Session();
 
 		// build container
 		this.container = new St.Widget({ reactive: true });
@@ -85,16 +87,35 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.settings.bind("debug_mode", "debugMode", null);
 		this.settings.bind("overrides_enabled", "overridesEnabled", bind(this, this._updateArt));
 		this.settings.bind("art_dir", "overridesDirectory", bind(this, this._updateArt));
+		this.settings.bind("disabled", "disabled", bind(this, this._toggleDesklet));
 
 		// initial setup
 		this._updateLayout();
-		this._updateArt();
 		this._updateFont();
-		this._updateTime();
-		this._startPolling(this.pollInterval);
+		this._toggleDesklet();
 	},
 
-	_startPolling: function(interval) {
+	_toggleDesklet: function () {
+		if (this.debugMode) {
+			global.log(`[music-display@nicholasjdi] toggled desklet, enabled: ${!this.disabled}`);
+		}
+		if (this._posTimeout) {
+	        GLib.source_remove(this._posTimeout);
+	        this._posTimeout = null;
+	    }
+	    if (this._pollTimer) {
+	        GLib.source_remove(this._pollTimer);
+	        this._pollTimer = null;
+	    }
+		this._lastStatus = null;
+		this._lastMetadataDump = null;
+		this._updateStatus();
+		if (!this.disabled) {
+			this._resetPolling();
+		}
+	},
+
+	_startPolling: function (interval) {
 		// cancel existing timer if any
 		if (this._pollTimer) {
 			GLib.source_remove(this._pollTimer);
@@ -110,7 +131,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		}
 	},
 
-	_resetPolling: function() {
+	_resetPolling: function () {
 		this._startPolling(this.pollInterval);
 	},
 
@@ -122,7 +143,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		return [flag];
 	},
 
-	_runPlayerctlAsync: function(argsArray, callback) {
+	_runPlayerctlAsync: function (argsArray, callback) {
 		try {
 			const argv = ['playerctl'];
 			const extra = this._getPlayerctlArgsArray();
@@ -209,6 +230,10 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	_updateTime: function () {
 		try {
+			if (this.disabled || !this.textEnabled) {
+				this._setTimeText("");
+				return;
+			} 
 			this._runPlayerctlAsync(['position'], timeOut => {
 				this._runPlayerctlAsync(['metadata', 'mpris:length'], lengthOut => {
 					lengthOut = lengthOut / 1000000
@@ -284,6 +309,13 @@ MusicDisplayAdditionsDesklet.prototype = {
 	},
 
 	_setTimeText: function(text) {
+		if (!text || text === "") {
+			this.timeLabel.hide();
+			if (this.disabled) this.timeLabel.set_text(" ");
+			return;
+		} else if (!this.timeLabel.visible) {
+			this.timeLabel.show();
+		}
 		if (this.debugMode) {
 			global.log(`[music-display@nicholasjdi] setting time text to ${text}`);
 		}
@@ -350,17 +382,14 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	_loadArtFromUrl: function (artUrl) {
 		try {
-			// Create session (no Async suffix in libSoup 3)
-			let session = new Soup.Session();
-
 			// Build GET message
 			let message = Soup.Message.new('GET', artUrl);
 
 			// Send asynchronously
-			session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null, (sess, res) => {
+			this._soupSession.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null, (sess, res) => {
 				try {
 					// Get bytes from response
-					let bytes = session.send_and_read_finish(res);
+					let bytes = this._soupSession.send_and_read_finish(res);
 					// Check status code
 					if (message.get_status() !== Soup.Status.OK) {
 						global.logWarning(`[music-display@nicholasjdi] Failed to download image: ${artUrl} status ${message.get_status()}`);
@@ -394,7 +423,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.container.width = this.xSize;
 		this.container.height = this.ySize;
 
-		if (this.artEnabled && !this._hideArt) {
+		if (this.artEnabled && !this._hideArt && !this.disabled) {
 			this._artSize = Math.min(this.xSize - 2 * this.margin, this.ySize - 2 * this.margin);
 			this.art.icon_size = this._artSize;
 			this.art.set_position(this.margin, this.margin);
@@ -444,19 +473,17 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	_positionLabel: function () {
 		// run on idle so label size is known
-		if (this._posTimeout) {
-			try { GLib.source_remove(this._posTimeout); } catch (e) {}
-		}
 		this._posTimeout = GLib.timeout_add(
 			GLib.PRIORITY_DEFAULT_IDLE,
 			0,
 			Lang.bind(this, function () {
-				this._posTimeout = null;
-
+				if (this._posTimeout) {
+	        		GLib.source_remove(this._posTimeout);
+	        		this._posTimeout = null;
+	    		}
 				if (this.textEnabled) this.timeLabel.show();
 				else {
 				this.timeLabel.hide();
-				return;
 				}
 
 				const labelW = this.timeLabel.get_width();
