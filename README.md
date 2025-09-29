@@ -69,4 +69,61 @@ Also the inspiration for this is from https://www.reddit.com/r/Minecraft/comment
 
 If your wondering, this is my desktop: (fonts are Minecraftia and Lobster)<br>
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/1f0f655f-e5b4-48fa-905f-28b97e55aab1" />
-
+<br><br><br>
+# Music-Display Additions
+Music-Display Additions is a Sister Desklet of Music-Display Desklet that shows current Time and Art of a Track using similar systems.
+## Instillation
+Same as Instillation for Music-Display Desklet, just also drag out `music-display-additions@nicholasjdi`.
+## Configuration
+Music-Display Additions Configuration is quite complex
+### Desklet Settings
+#### Disabled
+Whether or not to Disable the Desklet, this is also in the Context Menu.
+#### X/Y Size
+The X and Y Size of the Desklet.
+### Text Settings
+#### Enabled
+Whether or not Text is Enabled.
+#### Format
+%time|(modifier)%, %position|(modifier)%, %length|(modifier)%. (%time%)
+##### Modifiers include:
+0:00 = 0:01-1:17:03<br>
+00:00 = 00:01-1:17:03<br>
+00 = 1-1:17:03<br>
+0:0 = Adaptive to song length from other modifiers above<br>
+0 = 1-1:17:3<br>
+(default is 0:00)
+#### Font
+The Font of the Text.
+#### Color
+The Color of the Text.
+#### Position
+The Anchor Position of the Text, Values are: Top Left, Top Right, Bottom Left, Bottom Right, Center.
+#### X/Y Offset
+The X and Y Offset of the Text from the Anchor Position.
+#### No Art Position
+The Anchor Position of the Text when no Art is found, (not Art Enabled = false) Values are: Top Left, Top Right, Bottom Left, Bottom Right, Center.
+#### No Art X/Y Offset
+The X and Y Offset of the Text from the Anchor Position when no Art is found. (not Art Enabled = false) 
+### Art Settings
+#### Enabled
+Whether or not Text is Enabled.
+#### Margin Size
+The size of the Margin around Art.
+#### Margin Color
+The Color of the Margin around Art.
+#### Background Color
+The Color above the Margin, behind Art. (for if Art is transparent)
+#### Overrides Enabled
+Whether or not Per Track Art Overrides are Enabled.
+#### Art Override Directory
+The Directory to fetch Art Overrides from, Files are formatted as "(Artist) - (Title).png" so "Lemmino - Cipher.png" for example. (jpg and webp are also supported.)
+### Player Settings
+#### Time Polling Interval
+How often the Desklet checks Time and Art. (lower values make time grabbing more accurate)
+#### Player Polling Interval
+How often the desklet checks for Players.
+#### Player Whitelist
+A Comma-separated list of allowed Players. (rhythmbox,spotify)
+#### Treat Whitelist As Blacklist
+Whether or not to treat the Whitelist as a Blacklist
