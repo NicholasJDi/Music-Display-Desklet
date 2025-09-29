@@ -45,7 +45,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.noArtXOffset = -4;
 		this.noArtYOffset = 4;
 
-		this._hideArt = false;
+		this._hideArt = true;
 		this._artSize = null;
 		this._currentInterval = null;
 		this._lastMetadataDump = null;
@@ -63,9 +63,9 @@ MusicDisplayAdditionsDesklet.prototype = {
 		// cover art
 		this.art = new St.Icon({ icon_size: this.xSize });
 		this.container.add_actor(this.art);
-
+		
 		// single time label
-		this.timeLabel = new St.Label({ text: "test", style: "" });
+		this.timeLabel = new St.Label({ text: "", style: "" });
 		this.container.add_actor(this.timeLabel);
 
 		// settings binding
@@ -105,6 +105,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 
 		// initial setup
+		this.art.hide();
 		this._updateLayout();
 		this._updateFont();
 		this._toggleDesklet();
@@ -248,7 +249,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		try {
 			if (this.disabled || !this.textEnabled) {
 				this._setTimeText("");
-				return;
+				return true;
 			} 
 			this._runPlayerctlAsync(['position'], timeOut => {
 				this._runPlayerctlAsync(['metadata', 'mpris:length'], lengthOut => {
@@ -325,18 +326,20 @@ MusicDisplayAdditionsDesklet.prototype = {
 	},
 
 	_setTimeText: function(text) {
-		if (!text || text === "") {
-			this.timeLabel.hide();
-			if (this.disabled) this.timeLabel.set_text(" ");
-			return;
-		} else if (!this.timeLabel.visible) {
-			this.timeLabel.show();
-		}
-		if (this.debugMode) {
-			global.log(`[music-display@nicholasjdi] setting time text to ${text}`);
-		}
-		this.timeLabel.set_text(text);
-		this._positionLabel();
+		try {
+			if (!text || text === "") {
+				this.timeLabel.hide();
+				if (this.disabled || !text) this.timeLabel.set_text(" ");
+				return true;
+			} else if (!this.timeLabel.visible) {
+				this.timeLabel.show();
+			}
+			if (this.debugMode) {
+				global.log(`[music-display@nicholasjdi] setting time text to ${text}`);
+			}
+			this.timeLabel.set_text(text);
+			this._positionLabel();
+		} catch (e) {global.logError(`[music-display-additions@nicholasjdi] _setTimeText exception: ${e}`);}
 	},
 
 	_setArt: function (artUrl) {
@@ -344,7 +347,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 			if (!artUrl || artUrl === "") {
 				this._hideArt = true;
 				this._updateLayout();
-				return;
+				return true;
 			}
 			this._artSize = Math.min(this.xSize - 2 * this.margin, this.ySize - 2 * this.margin);
 			if (artUrl.startsWith("https://")) {
@@ -358,7 +361,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 				}
 				this._loadArtFromFile(artUrl);
 			}
- 		} finally {if (this._hideArt) this._updateLayout();}
+		} catch (e) {global.logError(`[music-display-additions@nicholasjdi] _setTimeText exception: ${e}`);}
 	},
 
 	_loadArtFromFile: function (artPath) {
@@ -366,7 +369,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 			if (!artPath) {
 				this._hideArt = true;
 				this._updateLayout();
-				return;
+				return true;
 			}
 
 			// Normalize path
@@ -374,7 +377,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 			if (!GLib.file_test(localPath, GLib.FileTest.EXISTS)) {
 				global.logWarning(`[music-display@nicholasjdi] File does not exist: ${localPath}`);
 				this._hideArt = true;
-				return;
+				return true;
 			}
 
 			// Set icon size first
@@ -410,7 +413,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 					if (message.get_status() !== Soup.Status.OK) {
 						global.logWarning(`[music-display@nicholasjdi] Failed to download image: ${artUrl} status ${message.get_status()}`);
 						this._hideArt = true;
-						return;
+						return true;
 					}
 
 					// Save to temp file
@@ -444,18 +447,18 @@ MusicDisplayAdditionsDesklet.prototype = {
 			this.art.icon_size = this._artSize;
 			this.art.set_position(this.margin, this.margin);
 			this.backdrop.set_position(this.margin, this.margin);
-			this.backdrop.style = `background-color: ${this.backgroundColor};`;
 			this.backdrop.set_size(this._artSize, this._artSize)
 			this.art.show();
+			this.backdrop.style = `background-color: ${this.backgroundColor};`;
 			if (this.margin > 0) this.container.style = `background-color: ${this.marginColor};`;
-			else this.container.style = ``
+			else this.container.style = ``;
 		} else {
-			this.art.hide();
 			this._hideArt = false;
+			this.art.hide();
 			this.container.style = "";
 			this.backdrop.style = "";
 		}
-
+		
 		this._positionLabel();
 	},
 

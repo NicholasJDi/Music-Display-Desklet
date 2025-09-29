@@ -160,7 +160,7 @@
         "type": "filechooser",
         "description": "Art Override Directory",
         "default": "",
-        "tooltip": "The Directory to fetch Art Overrides from,\nFiles are formmated as \"(Artist) - (Title).png\" so \"Lemmino - Cipher.png\" for example.",
+        "tooltip": "The Directory to fetch Art Overrides from,\nFiles are formatted as \"(Artist) - (Title).png\" so \"Lemmino - Cipher.png\" for example.",
         "select-dir" : true,
         "dependency": "overrides_enabled"
     },
