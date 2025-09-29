@@ -1,4 +1,5 @@
 const Desklet = imports.ui.desklet;
+const PopupMenu = imports.ui.popupMenu;
 const St = imports.gi.St;
 const Lang = imports.lang;
 const Gio = imports.gi.Gio;
@@ -21,10 +22,10 @@ MusicDisplayAdditionsDesklet.prototype = {
 		// default props, will be overwritten by settings.bind()
 		this.xSize = 200;
 		this.ySize = 200;
-		this.position = "top_right";
-		this.xOffset = -20;
-		this.yOffset = 20;
-		this.margin = 10;
+		this.position = "bottom_left";
+		this.xOffset = 10;
+		this.yOffset = -10;
+		this.margin = 5;
 		this.marginColor = "white";
 		this.backgroundColor = "black";
 		this.timeFormat = "%time%";
@@ -40,6 +41,9 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.overridesEnabled = false;
 		this.overridesDirectory = "";
 		this.disabled = false;
+		this.noArtPosition = "top_right";
+		this.noArtXOffset = -4;
+		this.noArtYOffset = 4;
 
 		this._hideArt = false;
 		this._artSize = null;
@@ -88,6 +92,17 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.settings.bind("overrides_enabled", "overridesEnabled", bind(this, this._updateArt));
 		this.settings.bind("art_dir", "overridesDirectory", bind(this, this._updateArt));
 		this.settings.bind("disabled", "disabled", bind(this, this._toggleDesklet));
+		this.settings.bind("no_art_position", "noArtPosition", bind(this, this._positionLabel));
+		this.settings.bind("no_art_x_offset", "noArtXOffset", bind(this, this._positionLabel));
+		this.settings.bind("no_art_y_offset", "noArtYOffset", bind(this, this._positionLabel));
+
+		// context menu
+		this.checkbox = new PopupMenu.PopupSwitchMenuItem("Disabled",this.disabled);
+		this.checkbox.connect("toggled", Lang.bind(this, this.on_checkbox_toggled));
+		this._menu.addMenuItem(this.checkbox);
+		this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+		this._menu.addAction(_('Reload'), Lang.bind(this, this._toggleDesklet));
+
 
 		// initial setup
 		this._updateLayout();
@@ -96,17 +111,18 @@ MusicDisplayAdditionsDesklet.prototype = {
 	},
 
 	_toggleDesklet: function () {
+		this.checkbox.setToggleState(this.disabled);
 		if (this.debugMode) {
 			global.log(`[music-display@nicholasjdi] toggled desklet, enabled: ${!this.disabled}`);
 		}
 		if (this._posTimeout) {
-	        GLib.source_remove(this._posTimeout);
-	        this._posTimeout = null;
-	    }
-	    if (this._pollTimer) {
-	        GLib.source_remove(this._pollTimer);
-	        this._pollTimer = null;
-	    }
+			GLib.source_remove(this._posTimeout);
+			this._posTimeout = null;
+		}
+		if (this._pollTimer) {
+			GLib.source_remove(this._pollTimer);
+			this._pollTimer = null;
+		}
 		this._lastStatus = null;
 		this._lastMetadataDump = null;
 		this._updateStatus();
@@ -279,19 +295,19 @@ MusicDisplayAdditionsDesklet.prototype = {
 			this._runPlayerctlAsync(['metadata', "mpris:artUrl"], artUrlOut => {
 				let artUrl = artUrlOut;
 
-            	// If overrides are enabled, try to find a local override image
-            	if (this.overridesEnabled && this.overridesDirectory) {
-            	    // to build your own file name pattern.
-            	    this._runPlayerctlAsync(['metadata', 'xesam:artist'], artist => {
-            	        this._runPlayerctlAsync(['metadata', 'xesam:title'], title => {
-            	            let safeArtist = (artist || 'unknown').replace(/[/\\?%*:|"<>]/g, '_');
-            	            let safeTitle = (title || 'unknown').replace(/[/\\?%*:|"<>]/g, '_');
+				// If overrides are enabled, try to find a local override image
+				if (this.overridesEnabled && this.overridesDirectory) {
+					// to build your own file name pattern.
+					this._runPlayerctlAsync(['metadata', 'xesam:artist'], artist => {
+						this._runPlayerctlAsync(['metadata', 'xesam:title'], title => {
+							let safeArtist = (artist || 'unknown').replace(/[/\\?%*:|"<>]/g, '_');
+							let safeTitle = (title || 'unknown').replace(/[/\\?%*:|"<>]/g, '_');
 			
-            	            const exts = ['png','jpg','jpeg','webp'];
+							const exts = ['png','jpg','jpeg','webp'];
 							for (let ext of exts) {
-							    let candidate = GLib.build_filenamev([this.overridesDirectory, `${safeArtist} - ${safeTitle}.${ext}`]);
-							    if (GLib.file_test(candidate.replace("file://",""), GLib.FileTest.EXISTS)) {
-							        artUrl = candidate;
+								let candidate = GLib.build_filenamev([this.overridesDirectory, `${safeArtist} - ${safeTitle}.${ext}`]);
+								if (GLib.file_test(candidate.replace("file://",""), GLib.FileTest.EXISTS)) {
+									artUrl = candidate;
 									if (this.debugMode) {
 										global.log(`[music-display@nicholasjdi] grabbed override art from ${artUrl}`);
 									}
@@ -299,9 +315,9 @@ MusicDisplayAdditionsDesklet.prototype = {
 								}
 							}
 							this._setArt(artUrl);
-            	        });
-            	    });
-            	} else this._setArt(artUrl);
+						});
+					});
+				} else this._setArt(artUrl);
 			});
 		} catch (e) {
 			global.logError(`[music-display-additions@nicholasjdi] _updateArt exception: ${e}`);
@@ -478,12 +494,21 @@ MusicDisplayAdditionsDesklet.prototype = {
 			0,
 			Lang.bind(this, function () {
 				if (this._posTimeout) {
-	        		GLib.source_remove(this._posTimeout);
-	        		this._posTimeout = null;
-	    		}
+					GLib.source_remove(this._posTimeout);
+					this._posTimeout = null;
+				}
 				if (this.textEnabled) this.timeLabel.show();
 				else {
-				this.timeLabel.hide();
+					this.timeLabel.hide();
+				}
+
+				let position = this.position;
+				let xOffset = this.xOffset;
+				let yOffset = this.yOffset;
+				if (this.artEnabled && !this.art.visible) {
+					position = this.noArtPosition;
+					xOffset = this.noArtXOffset;
+					yOffset = this.noArtYOffset;
 				}
 
 				const labelW = this.timeLabel.get_width();
@@ -493,7 +518,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 				const m = this.margin;
 
 				let anchorX = 0, anchorY = 0;
-				switch (this.position) {
+				switch (position) {
 					case "top_left":	 anchorX = m;		 anchorY = m;		 break;
 					case "top_right":	 anchorX = dsW - m;	 anchorY = m;		 break;
 					case "bottom_left":  anchorX = m;		 anchorY = dsH - m;	 break;
@@ -503,19 +528,19 @@ MusicDisplayAdditionsDesklet.prototype = {
 				}
 
 				let leftX, topY;
-				if (this.position.endsWith("_left"))
-					leftX = anchorX + this.xOffset;
-				else if (this.position.endsWith("_right"))
-					leftX = anchorX - labelW + this.xOffset;
+				if (position.endsWith("_left"))
+					leftX = anchorX + xOffset;
+				else if (position.endsWith("_right"))
+					leftX = anchorX - labelW + xOffset;
 				else
-					leftX = anchorX - Math.round(labelW / 2) + this.xOffset;
+					leftX = anchorX - Math.round(labelW / 2) + xOffset;
 
-				if (this.position.startsWith("top"))
-					topY = anchorY + this.yOffset;
-				else if (this.position.startsWith("bottom"))
-					topY = anchorY - labelH + this.yOffset;
+				if (position.startsWith("top"))
+					topY = anchorY + yOffset;
+				else if (position.startsWith("bottom"))
+					topY = anchorY - labelH + yOffset;
 				else
-					topY = anchorY - Math.round(labelH / 2) + this.yOffset;
+					topY = anchorY - Math.round(labelH / 2) + yOffset;
 
 				this.timeLabel.set_position(Math.round(leftX), Math.round(topY));
 				return false;
@@ -523,15 +548,20 @@ MusicDisplayAdditionsDesklet.prototype = {
 		);
 	},
 
+	on_checkbox_toggled: function (checkbox, value) {
+		this.disabled = value;
+		this._toggleDesklet();
+	},
+
 	on_desklet_removed: function () {
-	    if (this._posTimeout) {
-	        GLib.source_remove(this._posTimeout);
-	        this._posTimeout = null;
-	    }
-	    if (this._pollTimer) {
-	        GLib.source_remove(this._pollTimer);
-	        this._pollTimer = null;
-	    }
+		if (this._posTimeout) {
+			GLib.source_remove(this._posTimeout);
+			this._posTimeout = null;
+		}
+		if (this._pollTimer) {
+			GLib.source_remove(this._pollTimer);
+			this._pollTimer = null;
+		}
 	}
 
 };

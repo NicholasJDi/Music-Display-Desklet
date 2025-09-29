@@ -57,7 +57,7 @@
     "position": {
         "type": "combobox",
         "description": "Position",
-        "default": "top_right",
+        "default": "bottom_left",
         "options": {
             "Top Left": "top_left",
             "Top Right": "top_right",
@@ -70,7 +70,7 @@
     "x_offset": {
         "type": "spinbutton",
         "description": "X Offset (pixels)",
-        "default": -20,
+        "default": 10,
         "min": -1000,
         "max": 1000,
         "step": 1,
@@ -79,11 +79,45 @@
     "y_offset": {
         "type": "spinbutton",
         "description": "Y Offset (pixels)",
-        "default": 20,
+        "default": -10,
         "min": -1000,
         "max": 1000,
         "step": 1,
         "tooltip": "Text Y Offset"
+    },
+    "no_art_position": {
+        "type": "combobox",
+        "description": "No Art Position",
+        "default": "top_right",
+        "options": {
+            "Top Left": "top_left",
+            "Top Right": "top_right",
+            "Bottom Left": "bottom_left",
+            "Bottom Right": "bottom_right",
+            "Center": "center"
+        },
+        "tooltip": "Text Anchor Position when no Art is found. (not Art Enabled = false)",
+        "dependency": "art_enabled"
+    },
+    "no_art_x_offset": {
+        "type": "spinbutton",
+        "description": "No Art X Offset (pixels)",
+        "default": -4,
+        "min": -1000,
+        "max": 1000,
+        "step": 1,
+        "tooltip": "Text X Offset when no Art is found. (not Art Enabled = false)",
+        "dependency": "art_enabled"
+    },
+    "no_art_y_offset": {
+        "type": "spinbutton",
+        "description": "No Art Y Offset (pixels)",
+        "default": 4,
+        "min": -1000,
+        "max": 1000,
+        "step": 1,
+        "tooltip": "Text Y Offset when no Art is found. (not Art Enabled = false)",
+        "dependency": "art_enabled"
     },
     "head3":{
         "type": "header",
@@ -97,9 +131,9 @@
     "margin": {
         "type": "spinbutton",
         "description": "Margin Size (pixels)",
-        "default": 10,
+        "default": 5,
         "min": 0,
-        "max": 200,
+        "max": 100,
         "step": 1,
         "tooltip": "The size of the Margin around Art"
     },
