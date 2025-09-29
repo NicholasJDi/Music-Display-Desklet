@@ -63,7 +63,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		// cover art
 		this.art = new St.Icon({ icon_size: this.xSize });
 		this.container.add_actor(this.art);
-		
+
 		// single time label
 		this.timeLabel = new St.Label({ text: "", style: "" });
 		this.container.add_actor(this.timeLabel);
@@ -205,7 +205,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 				if (!status || status === "Stopped") {
 					// No Player / Stopped
-					this._setTimeText("");
+					this._setTimeText();
 					this._setArt("");
 				} else {
 					// Playing / Paused
@@ -250,7 +250,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 			if (this.disabled || !this.textEnabled) {
 				this._setTimeText("");
 				return true;
-			} 
+			}
 			this._runPlayerctlAsync(['position'], timeOut => {
 				this._runPlayerctlAsync(['metadata', 'mpris:length'], lengthOut => {
 					lengthOut = lengthOut / 1000000
@@ -303,7 +303,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 						this._runPlayerctlAsync(['metadata', 'xesam:title'], title => {
 							let safeArtist = (artist || 'unknown').replace(/[/\\?%*:|"<>]/g, '_');
 							let safeTitle = (title || 'unknown').replace(/[/\\?%*:|"<>]/g, '_');
-			
+
 							const exts = ['png','jpg','jpeg','webp'];
 							for (let ext of exts) {
 								let candidate = GLib.build_filenamev([this.overridesDirectory, `${safeArtist} - ${safeTitle}.${ext}`]);
@@ -369,6 +369,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 			if (!artPath) {
 				this._hideArt = true;
 				this._updateLayout();
+				this.art.set_icon("");
 				return true;
 			}
 
@@ -416,8 +417,15 @@ MusicDisplayAdditionsDesklet.prototype = {
 						return true;
 					}
 
+					// Grab url hash
+					const hash = GLib.compute_checksum_for_string(
+					    GLib.ChecksumType.SHA256,
+					    artUrl,
+					    -1
+					).substring(0,16);
+
 					// Save to temp file
-					let tmpPath = GLib.build_filenamev([GLib.get_tmp_dir(), 'music_display_art.png']);
+					let tmpPath = GLib.build_filenamev([GLib.get_tmp_dir(), `music_display_art_${hash}.png`]);
 					GLib.file_set_contents(tmpPath, bytes.get_data());
 
 					if (this.debugMode) {
@@ -426,6 +434,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 					// Load it as local file
 					this._loadArtFromFile(tmpPath);
+					GLib.unlink(tmpPath);
 				} catch (e) {
 					global.logWarning(`[music-display@nicholasjdi] Error reading response: ${e.message}`);
 					this._hideArt = true;
@@ -458,7 +467,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 			this.container.style = "";
 			this.backdrop.style = "";
 		}
-		
+
 		this._positionLabel();
 	},
 
@@ -565,6 +574,8 @@ MusicDisplayAdditionsDesklet.prototype = {
 			GLib.source_remove(this._pollTimer);
 			this._pollTimer = null;
 		}
+		delete this._soupSession;
+		this.settings.finalize();
 	}
 
 };
