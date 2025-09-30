@@ -51,6 +51,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this._lastMetadataDump = null;
 		this._lastStatus = null;
 		this._soupSession = new Soup.Session();
+		this._failArt = false;
 
 		// build container
 		this.container = new St.Widget({ reactive: true });
@@ -100,14 +101,19 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.checkbox = new PopupMenu.PopupSwitchMenuItem("Disabled",this.disabled);
 		this.checkbox.connect("toggled", Lang.bind(this, this.on_checkbox_toggled));
 		this._menu.addMenuItem(this.checkbox);
+
+		this.failCheckbox = new PopupMenu.PopupSwitchMenuItem("Fail Art",this._failArt);
+		this.failCheckbox.connect("toggled", Lang.bind(this, this.on_failCheckbox_toggled));
+		this._menu.addMenuItem(this.failCheckbox);
+
 		this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 		this._menu.addAction(_('Reload'), Lang.bind(this, this._toggleDesklet));
 
 
 		// initial setup
 		this.art.hide();
-		this._updateLayout();
 		this._updateFont();
+		this._updateLayout();
 		this._toggleDesklet();
 	},
 
@@ -419,9 +425,9 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 					// Grab url hash
 					const hash = GLib.compute_checksum_for_string(
-					    GLib.ChecksumType.SHA256,
-					    artUrl,
-					    -1
+						GLib.ChecksumType.SHA256,
+						artUrl,
+						-1
 					).substring(0,16);
 
 					// Save to temp file
@@ -451,7 +457,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.container.width = this.xSize;
 		this.container.height = this.ySize;
 
-		if (this.artEnabled && !this._hideArt && !this.disabled) {
+		if (this.artEnabled && !this._hideArt && !this.disabled && !this._failArt) {
 			this._artSize = Math.min(this.xSize - 2 * this.margin, this.ySize - 2 * this.margin);
 			this.art.icon_size = this._artSize;
 			this.art.set_position(this.margin, this.margin);
@@ -562,6 +568,11 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	on_checkbox_toggled: function (checkbox, value) {
 		this.disabled = value;
+		this._toggleDesklet();
+	},
+
+	on_failCheckbox_toggled: function (checkbox, value) {
+		this._failArt = value;
 		this._toggleDesklet();
 	},
 
