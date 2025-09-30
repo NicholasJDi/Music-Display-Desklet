@@ -127,5 +127,5 @@ How often the desklet checks for Players.
 A Comma-separated list of allowed Players. (rhythmbox,spotify)
 #### Treat Whitelist As Blacklist
 Whether or not to treat the Whitelist as a Blacklist
-## Example
+### Example
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/abc51516-e519-4729-afb8-c66fe6f18fb7" />
