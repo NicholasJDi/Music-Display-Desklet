@@ -5,6 +5,7 @@ const Lang = imports.lang;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 const Settings = imports.ui.settings;
+const Pango = imports.gi.Pango;
 
 function MusicDisplayDesklet(metadata, instance_id) {
 	this._init(metadata, instance_id);
@@ -21,10 +22,10 @@ MusicDisplayDesklet.prototype = {
 		// Defaults
 		this.line1Format = "%title%";
 		this.line2Format = "%artist%";
-		this.line1Font = "";
-		this.line2Font = "";
-		this.line1Size = 25;
-		this.line2Size = 18;
+		this.line1Font = "ubuntu 20";
+		this.line2Font = "ubuntu 12";
+		this.line1Color = "white";
+		this.line2Color = "white";
 
 		this.line1_no_player = "No player running";
 		this.line2_no_player = "";
@@ -155,14 +156,14 @@ MusicDisplayDesklet.prototype = {
 		// Line 1
 		settings.bind("line1_format", "line1Format", bind(this, this._updateAll));
 		settings.bind("line1_font", "line1Font", bind(this, this._updateAll));
-		settings.bind("line1_size", "line1Size", bind(this, this._updateAll));
+		settings.bind("line1_color", "line1Color", bind(this, this._updateAll));
 		settings.bind("line1_no_player", "line1_no_player", bind(this, this._updateStatus));
 		settings.bind("line1_stopped", "line1_stopped", bind(this, this._updateStatus));
 
 		// Line 2
 		settings.bind("line2_format", "line2Format", bind(this, this._updateAll));
 		settings.bind("line2_font", "line2Font", bind(this, this._updateAll));
-		settings.bind("line2_size", "line2Size", bind(this, this._updateAll));
+		settings.bind("line2_color", "line2Color", bind(this, this._updateAll));
 		settings.bind("line2_no_player", "line2_no_player", bind(this, this._updateStatus));
 		settings.bind("line2_stopped", "line2_stopped", bind(this, this._updateStatus));
 
@@ -214,8 +215,44 @@ MusicDisplayDesklet.prototype = {
 	},
 
 	_updateFont: function() {
-		this.labelTitle.style = `${this.line1Font ? "font-family:" + this.line1Font + ";" : ""} font-size: ${this.line1Size}px;`;
-		this.labelArtist.style = `${this.line2Font ? "font-family:" + this.line2Font + ";" : ""} font-size: ${this.line2Size}px;`;
+		// parse the font string from the settings
+		let desc1 = Pango.font_description_from_string(this.line1Font);
+		let desc2 = Pango.font_description_from_string(this.line2Font);
+
+		// get family
+		let family1 = desc1.get_family();
+		let family2 = desc2.get_family();
+		// get size in points
+		let size1 = desc1.get_size() / Pango.SCALE;
+		let size2 = desc2.get_size() / Pango.SCALE;
+		// get weight and style
+		let weight1 = desc1.get_weight();
+		let style1 = desc1.get_style();
+		let weight2 = desc2.get_weight();
+		let style2 = desc2.get_style();
+
+		// turn weight/style into CSS-friendly strings
+		let weightStr1 = (weight1 >= Pango.Weight.BOLD) ? 'bold' : 'normal';
+		let styleStr1 = (style1 === Pango.Style.ITALIC) ? 'italic'
+						: (style1 === Pango.Style.OBLIQUE) ? 'oblique' : 'normal';
+		let weightStr2 = (weight2 >= Pango.Weight.BOLD) ? 'bold' : 'normal';
+		let styleStr2 = (style2 === Pango.Style.ITALIC) ? 'italic'
+						: (style2 === Pango.Style.OBLIQUE) ? 'oblique' : 'normal';
+
+		// now build a style string for St.Label
+		this.labelTitle.style =
+			'font-family: ' + family1 + '; ' +
+			'font-weight: ' + weightStr1 + '; ' +
+			'font-style: ' + styleStr1 + '; ' +
+			'font-size: ' + size1 + 'pt; ' +
+			'color: ' + this.line1Color + ';';
+		this.labelArtist.style =
+			'font-family: ' + family2 + '; ' +
+			'font-weight: ' + weightStr2 + '; ' +
+			'font-style: ' + styleStr2 + '; ' +
+			'font-size: ' + size2 + 'pt; ' +
+			'color: ' + this.line2Color + ';';
+		
 		if (this.debugMode) {
 		global.log(`[music-display@nicholasjdi] Update font`);
 		}

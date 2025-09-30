@@ -1,169 +1,167 @@
 {
-    "head1": {
-        "type": "header",
-        "description": "Line 1 Settings"
-    },
-    "line1_format": {
-        "type": "entry",
-        "description": "Format",
-        "default": "%title%",
-        "tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display"
-    },
-    "line1_font": {
-        "type": "entry",
-        "description": "Font",
-        "default": ""
-    },
-    "line1_size": {
-        "type": "scale",
-        "description": "Font size",
-        "default": 25,
-        "min": 6,
-        "max": 72,
-        "step": 1
-    },
-    "line1_no_player": {
-    "type": "entry",
-    "description": "Line 1 text when no player is running",
-    "default": "No player running"
-    },
+	"head1": {
+		"type": "header",
+		"description": "Line 1 Settings"
+	},
+	"line1_format": {
+		"type": "entry",
+		"description": "Format",
+		"default": "%title%",
+		"tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display"
+	},
+	"line1_font": {
+		"type": "fontchooser",
+		"description": "Font",
+		"default": "ubuntu 20"
+	},
+	"line1_color": {
+		"type": "colorchooser",
+		"description": "Color",
+		"default": "white"
+	},
+	"line1_no_player": {
+		"type": "entry",
+		"description": "Line 1 text when no player is running",
+		"default": "No player running"
+	},
 	"line1_stopped": {
-	    "type": "entry",
-	    "description": "Line 1 text when player is stopped",
-	    "default": "Player %player% is stopped",
-        "tooltip": "Use %player% to get running player id"
+		"type": "entry",
+		"description": "Line 1 text when player is stopped",
+		"default": "Player %player% is stopped",
+		"tooltip": "Use %player% to get running player id"
 	},
 
-    "head2": {
-        "type": "header",
-        "description": "Line 2 Settings"
-    },
-    "line2_format": {
-        "type": "entry",
-        "description": "Format",
-        "default": "%artist%",
-        "tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display"
-    },
-    "line2_font": {
-        "type": "entry",
-        "description": "Font",
-        "default": ""
-    },
-    "line2_size": {
-        "type": "scale",
-        "description": "Font size",
-        "default": 18,
-        "min": 6,
-        "max": 72,
-        "step": 1
-    },
+	"head2": {
+		"type": "header",
+		"description": "Line 2 Settings"
+	},
+	"line2_format": {
+		"type": "entry",
+		"description": "Format",
+		"default": "%artist%",
+		"tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display"
+	},
+	"line2_font": {
+		"type": "fontchooser",
+		"description": "Font",
+		"default": "ubuntu 12"
+	},
+	"line2_color": {
+		"type": "colorchooser",
+		"description": "Color",
+		"default": "white"
+	},
 	"line2_no_player": {
-	    "type": "entry",
-	    "description": "Line 2 text when no player is running",
-	    "default": ""
+		"type": "entry",
+		"description": "Line 2 text when no player is running",
+		"default": ""
 	},
 	"line2_stopped": {
-	    "type": "entry",
-	    "description": "Line 2 text when player is stopped",
-	    "default": "",
-        "tooltip": "Use %player% to get running player id"
+		"type": "entry",
+		"description": "Line 2 text when player is stopped",
+		"default": "",
+		"tooltip": "Use %player% to get running player id"
 	},
 
-    "head3": {
-        "type": "header",
-        "description": "Button Settings"
-    },
-    "button_text_spacing": {
-        "type": "scale",
-        "description": "Spacing (pixels) between buttons and text",
-        "default": 7,
-        "min": 0,
-        "max": 50,
-        "step": 1
-    },
-    "hide_all_buttons": {
-        "type": "checkbox",
-        "description": "Hide all buttons",
-        "default": false,
-        "tooltip":"(overrides hide skip buttons when true)"
-    },
-    "hide_skip_buttons": {
-        "type": "checkbox",
-        "description": "Hide skip buttons (previous/next)",
-        "default": false
-    },
+	"head3": {
+		"type": "header",
+		"description": "Button Settings"
+	},
+	"button_text_spacing": {
+		"type": "scale",
+		"description": "Spacing (pixels) between buttons and text",
+		"default": 7,
+		"min": 0,
+		"max": 50,
+		"step": 1
+	},
+	"hide_all_buttons": {
+		"type": "checkbox",
+		"description": "Hide all buttons",
+		"default": false,
+		"tooltip":"(overrides hide skip buttons when true)"
+	},
+	"hide_skip_buttons": {
+		"type": "checkbox",
+		"description": "Hide skip buttons (previous/next)",
+		"default": false
+	},
 	"button_size": {
-    "type": "scale",
-    "description": "Button size (pixels)",
-    "default": 34,
-    "min": 8,
-    "max": 128,
-    "step": 1
+	"type": "scale",
+	"description": "Button size (pixels)",
+	"default": 34,
+	"min": 8,
+	"max": 128,
+	"step": 1
 	},
-    "btn_play_texture": {
-        "type": "filechooser",
-        "description": "Play button texture",
-        "default": ""
-    },
-    "btn_pause_texture": {
-        "type": "filechooser",
-        "description": "Pause button texture",
-        "default": ""
-    },
-    "btn_next_texture": {
-        "type": "filechooser",
-        "description": "Next button texture",
-        "default": ""
-    },
-    "btn_prev_texture": {
-        "type": "filechooser",
-        "description": "Previous button texture",
-        "default": ""
-    },
+	"btn_play_texture": {
+		"type": "filechooser",
+		"description": "Play button texture",
+		"default": ""
+	},
+	"btn_pause_texture": {
+		"type": "filechooser",
+		"description": "Pause button texture",
+		"default": ""
+	},
+	"btn_next_texture": {
+		"type": "filechooser",
+		"description": "Next button texture",
+		"default": ""
+	},
+	"btn_prev_texture": {
+		"type": "filechooser",
+		"description": "Previous button texture",
+		"default": ""
+	},
 
-    "head4": {
-        "type": "header",
-        "description": "Player Settings"
-    },
+	"head4": {
+		"type": "header",
+		"description": "Player Settings"
+	},
 	"poll_interval": {
-    "type": "scale",
-    "description": "Track polling interval (seconds)",
+	"type": "scale",
+	"description": "Track polling interval (seconds)",
 	"tooltip": "How often the desklet checks the current track. (playing/paused)\nWARNING: Lower values may heavily effect your system, it is not recommended to go below 1.0 track poll interval.",
-    "default": 1,
-    "min": 0.3,
-    "max": 10,
-    "step": 0.1
+	"default": 1,
+	"min": 0.3,
+	"max": 10,
+	"step": 0.1
 	},
 	"idle_poll_interval": {
-    "type": "scale",
-    "description": "Player polling interval (seconds)",
+	"type": "scale",
+	"description": "Player polling interval (seconds)",
 	"tooltip": "How often the desklet checks for players. (no player/stopped)",
-    "default": 3,
-    "min": 1,
-    "max": 10,
-    "step": 0.1
+	"default": 3,
+	"min": 1,
+	"max": 10,
+	"step": 0.1
 	},
-    "player_whitelist": {
-        "type": "entry",
-        "description": "Player whitelist",
-        "default": "rhythmbox,spotify",
-        "tooltip":"Comma-separated list of allowed players"
-    },
-    "treat_whitelist_as_blacklist": {
-        "type": "checkbox",
-        "description": "Treat whitelist as blacklist instead",
-        "default": false
-    },
-    "empty_values": {
-        "type": "entry",
-        "description": "Empty Values",
-        "default": "Unknown,None,N/A,0",
-        "tooltip":"Comma-separated list of values to treat as NULL in custom format tags"
-    },
-    "debug_mode": {
-    "type": "checkbox",
-        "description": "Debug Mode",
-        "default": false,
-        "tooltip":"Log debug outputs in cinnamon log"
-    }
+	"player_whitelist": {
+		"type": "entry",
+		"description": "Player whitelist",
+		"default": "rhythmbox,spotify",
+		"tooltip":"Comma-separated list of allowed players"
+	},
+	"treat_whitelist_as_blacklist": {
+		"type": "checkbox",
+		"description": "Treat whitelist as blacklist instead",
+		"default": false
+	},
+	"empty_values": {
+		"type": "entry",
+		"description": "Empty Values",
+		"default": "Unknown,None,N/A,0",
+		"tooltip":"Comma-separated list of values to treat as NULL in custom format tags"
+	},
+	"head5": {
+		"type": "header",
+		"description": ""
+	},
+	"debug_mode": {
+	"type": "checkbox",
+		"description": "Debug Mode",
+		"default": false,
+		"tooltip":"Log debug outputs in cinnamon log"
+	}
 }

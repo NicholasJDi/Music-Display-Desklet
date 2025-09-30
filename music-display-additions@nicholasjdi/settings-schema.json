@@ -1,210 +1,210 @@
 {
-    "head1": {
-        "type": "header",
-        "description": "Desklet Settings"
-    },
-    "disabled": {
-        "type": "checkbox",
-        "description": "Disabled",
-        "default": false,
-        "tooltip": "Disable the whole Desklet"
-    },
-    "x_size": {
-        "type": "spinbutton",
-        "description": "X Size (pixels)",
-        "default": 200,
-        "min": 10,
-        "max": 1000,
-        "step": 10,
-        "tooltip": "The X Size of the Desklet"
-    },
-    "y_size": {
-        "type": "spinbutton",
-        "description": "Y Size (pixels)",
-        "default": 200,
-        "min": 10,
-        "max": 1000,
-        "step": 10,
-        "tooltip": "The size of the Margin around Art"
-    },
-    "head2": {
-        "type": "header",
-        "description": "Text Settings"
-    },
-    "text_enabled":{
-        "type": "checkbox",
-        "description": "Enabled",
-        "default": true
-    },
-    "format": {
-        "type": "entry",
-        "description": "Format",
-        "default": "%time%",
-        "tooltip": "%time|(modifier)%, %position|(modifier)%, %length|(modifier)%.\nModifiers include:\n0:00 = 0:01-1:17:03\n00:00 = 00:01-1:17:03\n00 = 1-1:17:03\n0:0 = Adaptive to song length from other modifiers above\n0 = 1-1:17:3\n(default is 0:00)"
-    },
-    "font": {
-        "type": "fontchooser",
-        "description": "Font",
-        "default": "sans 12",
-        "tooltip": "Text Font"
-    },
-    "color" : {
-        "type": "colorchooser",
-        "description": "Color",
-        "default": "white",
-        "tooltip": "Text Color"
-    },
-    "position": {
-        "type": "combobox",
-        "description": "Position",
-        "default": "bottom_left",
-        "options": {
-            "Top Left": "top_left",
-            "Top Right": "top_right",
-            "Bottom Left": "bottom_left",
-            "Bottom Right": "bottom_right",
-            "Center": "center"
-        },
-        "tooltip": "Text Anchor Position"
-    },
-    "x_offset": {
-        "type": "spinbutton",
-        "description": "X Offset (pixels)",
-        "default": 10,
-        "min": -1000,
-        "max": 1000,
-        "step": 1,
-        "tooltip": "Text X Offset"
-    },
-    "y_offset": {
-        "type": "spinbutton",
-        "description": "Y Offset (pixels)",
-        "default": -10,
-        "min": -1000,
-        "max": 1000,
-        "step": 1,
-        "tooltip": "Text Y Offset"
-    },
-    "no_art_position": {
-        "type": "combobox",
-        "description": "No Art Position",
-        "default": "top_right",
-        "options": {
-            "Top Left": "top_left",
-            "Top Right": "top_right",
-            "Bottom Left": "bottom_left",
-            "Bottom Right": "bottom_right",
-            "Center": "center"
-        },
-        "tooltip": "Text Anchor Position when no Art is found. (not Art Enabled = false)",
-        "dependency": "art_enabled"
-    },
-    "no_art_x_offset": {
-        "type": "spinbutton",
-        "description": "No Art X Offset (pixels)",
-        "default": -4,
-        "min": -1000,
-        "max": 1000,
-        "step": 1,
-        "tooltip": "Text X Offset when no Art is found. (not Art Enabled = false)",
-        "dependency": "art_enabled"
-    },
-    "no_art_y_offset": {
-        "type": "spinbutton",
-        "description": "No Art Y Offset (pixels)",
-        "default": 4,
-        "min": -1000,
-        "max": 1000,
-        "step": 1,
-        "tooltip": "Text Y Offset when no Art is found. (not Art Enabled = false)",
-        "dependency": "art_enabled"
-    },
-    "head3":{
-        "type": "header",
-        "description": "Art Settings"
-    },
-    "art_enabled":{
-        "type": "checkbox",
-        "description": "Enabled",
-        "default": true
-    },
-    "margin": {
-        "type": "spinbutton",
-        "description": "Margin Size (pixels)",
-        "default": 5,
-        "min": 0,
-        "max": 100,
-        "step": 1,
-        "tooltip": "The size of the Margin around Art"
-    },
-    "margin_color": {
-        "type": "colorchooser",
-        "description": "Margin Color",
-        "default": "white",
-        "tooltip": "The Color of the Margin around Art",
-        "dependency": "margin>0"
-    },
-    "background_color": {
-        "type": "colorchooser",
-        "description": "Background Color",
-        "default": "black",
-        "tooltip": "The Color above the Margin, behind Art. (this is for if art is transparent. tranparent Background Color shows Margin Color)"
-    },
-    "overrides_enabled":{
-        "type": "checkbox",
-        "description": "Overrides Enabled",
-        "default": false,
-        "tooltip": "Per Track Art Overrides"
-    },
-    "art_dir": {
-        "type": "filechooser",
-        "description": "Art Override Directory",
-        "default": "",
-        "tooltip": "The Directory to fetch Art Overrides from,\nFiles are formatted as \"(Artist) - (Title).png\" so \"Lemmino - Cipher.png\" for example.",
-        "select-dir" : true,
-        "dependency": "overrides_enabled"
-    },
-    "head4": {
-        "type": "header",
-        "description": "Player Settings"
-    },
-    "poll_interval": {
-        "type": "scale",
-        "description": "Time polling interval (seconds)",
-        "tooltip": "How often the desklet checks Time and Art. (Lower values makes time grabbing more accurate)",
-        "default": 0.5,
-        "min": 0.1,
-        "max": 1,
-        "step": 0.1
-    },
-    "idle_poll_interval": {
-        "type": "scale",
-        "description": "Player polling interval (seconds)",
-        "tooltip": "How often the desklet checks for players.",
-        "default": 3,
-        "min": 1,
-        "max": 10,
-        "step": 0.1
-    },
-    "player_whitelist": {
-        "type": "entry",
-        "description": "Player whitelist",
-        "default": "rhythmbox,spotify",
-        "tooltip": "Comma-separated list of allowed players"
-    },
-    "treat_whitelist_as_blacklist": {
-        "type": "checkbox",
-        "description": "Treat whitelist as blacklist instead",
-        "default": false
-    },
-    "head5":{
-        "type": "header",
-        "description": ""
-    },
-    "debug_mode": {
-        "type": "checkbox",
-        "description": "Debug Mode",
-        "default": false,
-        "tooltip": "Log debug outputs in cinnamon log"
-    }
+	"head1": {
+		"type": "header",
+		"description": "Desklet Settings"
+	},
+	"disabled": {
+		"type": "checkbox",
+		"description": "Disabled",
+		"default": false,
+		"tooltip": "Disable the whole Desklet"
+	},
+	"x_size": {
+		"type": "spinbutton",
+		"description": "X Size (pixels)",
+		"default": 200,
+		"min": 10,
+		"max": 1000,
+		"step": 10,
+		"tooltip": "The X Size of the Desklet"
+	},
+	"y_size": {
+		"type": "spinbutton",
+		"description": "Y Size (pixels)",
+		"default": 200,
+		"min": 10,
+		"max": 1000,
+		"step": 10,
+		"tooltip": "The size of the Margin around Art"
+	},
+	"head2": {
+		"type": "header",
+		"description": "Text Settings"
+	},
+	"text_enabled":{
+		"type": "checkbox",
+		"description": "Enabled",
+		"default": true
+	},
+	"format": {
+		"type": "entry",
+		"description": "Format",
+		"default": "%time%",
+		"tooltip": "%time|(modifier)%, %position|(modifier)%, %length|(modifier)%.\nModifiers include:\n0:00 = 0:01-1:17:03\n00:00 = 00:01-1:17:03\n00 = 1-1:17:03\n0:0 = Adaptive to song length from other modifiers above\n0 = 1-1:17:3\n(default is 0:00)"
+	},
+	"font": {
+		"type": "fontchooser",
+		"description": "Font",
+		"default": "sans 12",
+		"tooltip": "Text Font"
+	},
+	"color" : {
+		"type": "colorchooser",
+		"description": "Color",
+		"default": "white",
+		"tooltip": "Text Color"
+	},
+	"position": {
+		"type": "combobox",
+		"description": "Position",
+		"default": "bottom_left",
+		"options": {
+			"Top Left": "top_left",
+			"Top Right": "top_right",
+			"Bottom Left": "bottom_left",
+			"Bottom Right": "bottom_right",
+			"Center": "center"
+		},
+		"tooltip": "Text Anchor Position"
+	},
+	"x_offset": {
+		"type": "spinbutton",
+		"description": "X Offset (pixels)",
+		"default": 10,
+		"min": -1000,
+		"max": 1000,
+		"step": 1,
+		"tooltip": "Text X Offset"
+	},
+	"y_offset": {
+		"type": "spinbutton",
+		"description": "Y Offset (pixels)",
+		"default": -10,
+		"min": -1000,
+		"max": 1000,
+		"step": 1,
+		"tooltip": "Text Y Offset"
+	},
+	"no_art_position": {
+		"type": "combobox",
+		"description": "No Art Position",
+		"default": "top_right",
+		"options": {
+			"Top Left": "top_left",
+			"Top Right": "top_right",
+			"Bottom Left": "bottom_left",
+			"Bottom Right": "bottom_right",
+			"Center": "center"
+		},
+		"tooltip": "Text Anchor Position when no Art is found. (not Art Enabled = false)",
+		"dependency": "art_enabled"
+	},
+	"no_art_x_offset": {
+		"type": "spinbutton",
+		"description": "No Art X Offset (pixels)",
+		"default": -4,
+		"min": -1000,
+		"max": 1000,
+		"step": 1,
+		"tooltip": "Text X Offset when no Art is found. (not Art Enabled = false)",
+		"dependency": "art_enabled"
+	},
+	"no_art_y_offset": {
+		"type": "spinbutton",
+		"description": "No Art Y Offset (pixels)",
+		"default": 4,
+		"min": -1000,
+		"max": 1000,
+		"step": 1,
+		"tooltip": "Text Y Offset when no Art is found. (not Art Enabled = false)",
+		"dependency": "art_enabled"
+	},
+	"head3":{
+		"type": "header",
+		"description": "Art Settings"
+	},
+	"art_enabled":{
+		"type": "checkbox",
+		"description": "Enabled",
+		"default": true
+	},
+	"margin": {
+		"type": "spinbutton",
+		"description": "Margin Size (pixels)",
+		"default": 5,
+		"min": 0,
+		"max": 100,
+		"step": 1,
+		"tooltip": "The size of the Margin around Art"
+	},
+	"margin_color": {
+		"type": "colorchooser",
+		"description": "Margin Color",
+		"default": "white",
+		"tooltip": "The Color of the Margin around Art",
+		"dependency": "margin>0"
+	},
+	"background_color": {
+		"type": "colorchooser",
+		"description": "Background Color",
+		"default": "black",
+		"tooltip": "The Color above the Margin, behind Art. (this is for if art is transparent. tranparent Background Color shows Margin Color)"
+	},
+	"overrides_enabled":{
+		"type": "checkbox",
+		"description": "Overrides Enabled",
+		"default": false,
+		"tooltip": "Per Track Art Overrides"
+	},
+	"art_dir": {
+		"type": "filechooser",
+		"description": "Art Override Directory",
+		"default": "",
+		"tooltip": "The Directory to fetch Art Overrides from,\nFiles are formatted as \"(Artist) - (Title).png\" so \"Lemmino - Cipher.png\" for example.",
+		"select-dir" : true,
+		"dependency": "overrides_enabled"
+	},
+	"head4": {
+		"type": "header",
+		"description": "Player Settings"
+	},
+	"poll_interval": {
+		"type": "scale",
+		"description": "Time polling interval (seconds)",
+		"tooltip": "How often the desklet checks Time and Art. (Lower values makes time grabbing more accurate)",
+		"default": 0.5,
+		"min": 0.1,
+		"max": 1,
+		"step": 0.1
+	},
+	"idle_poll_interval": {
+		"type": "scale",
+		"description": "Player polling interval (seconds)",
+		"tooltip": "How often the desklet checks for players.",
+		"default": 3,
+		"min": 1,
+		"max": 10,
+		"step": 0.1
+	},
+	"player_whitelist": {
+		"type": "entry",
+		"description": "Player whitelist",
+		"default": "rhythmbox,spotify",
+		"tooltip": "Comma-separated list of allowed players"
+	},
+	"treat_whitelist_as_blacklist": {
+		"type": "checkbox",
+		"description": "Treat whitelist as blacklist instead",
+		"default": false
+	},
+	"head5":{
+		"type": "header",
+		"description": ""
+	},
+	"debug_mode": {
+		"type": "checkbox",
+		"description": "Debug Mode",
+		"default": false,
+		"tooltip": "Log debug outputs in cinnamon log"
+	}
 }

@@ -1,7 +1,7 @@
 {
-    "uuid": "music-display@nicholasjdi",
-    "name": "Music Display",
-    "description": "A Linux Mint Cinnamon Desklet for displaying what is currently being played by Players supporting the MPRIS D-Bus specification using playerctl",
-    "version": "1.5.3",
-    "author": "NicholasJDi"
+	"uuid": "music-display@nicholasjdi",
+	"name": "Music Display",
+	"description": "A Linux Mint Cinnamon Desklet for displaying what is currently being played by Players supporting the MPRIS D-Bus specification using playerctl",
+	"version": "1.5.3",
+	"author": "NicholasJDi"
 }
