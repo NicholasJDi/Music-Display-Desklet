@@ -90,7 +90,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.settings.bind("player_whitelist", "playerWhitelist", bind(this, this._updateStatus));
 		this.settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", bind(this, this._updateStatus));
 		this.settings.bind("debug_mode", "debugMode", null);
-		this.settings.bind("overrides_enabled", "overridesEnabled", bind(this, this._updateArt));
+		this.settings.bind("overrides_enabled", "overridesEnabled", bind(this, this._toggleDesklet));
 		this.settings.bind("art_dir", "overridesDirectory", bind(this, this._updateArt));
 		this.settings.bind("disabled", "disabled", bind(this, this._toggleDesklet));
 		this.settings.bind("no_art_position", "noArtPosition", bind(this, this._positionLabel));
@@ -112,7 +112,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 		this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 		this._menu.addAction(_('Reload'), Lang.bind(this, this._toggleDesklet));
-
+		
 
 		// initial setup
 		this.art.hide();
@@ -120,7 +120,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this._updateLayout();
 		this._toggleDesklet();
 	},
-
+	
 	_toggleDesklet: function () {
 		this.checkbox.setToggleState(this.disabled);
 		this.overridesCheckbox.setToggleState(this.overridesEnabled);
