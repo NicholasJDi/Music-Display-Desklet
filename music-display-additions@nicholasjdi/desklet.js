@@ -102,6 +102,10 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.checkbox.connect("toggled", Lang.bind(this, this.on_checkbox_toggled));
 		this._menu.addMenuItem(this.checkbox);
 
+		this.overridesCheckbox = new PopupMenu.PopupSwitchMenuItem("Art Overrides",this.overridesEnabled);
+		this.overridesCheckbox.connect("toggled", Lang.bind(this, this.on_overridesCheckbox_toggled));
+		this._menu.addMenuItem(this.overridesCheckbox);
+
 		this.failCheckbox = new PopupMenu.PopupSwitchMenuItem("Fail Art",this._failArt);
 		this.failCheckbox.connect("toggled", Lang.bind(this, this.on_failCheckbox_toggled));
 		this._menu.addMenuItem(this.failCheckbox);
@@ -119,6 +123,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	_toggleDesklet: function () {
 		this.checkbox.setToggleState(this.disabled);
+		this.overridesCheckbox.setToggleState(this.overridesEnabled);
 		if (this.debugMode) {
 			global.log(`[music-display@nicholasjdi] toggled desklet, enabled: ${!this.disabled}`);
 		}
@@ -568,6 +573,11 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	on_checkbox_toggled: function (checkbox, value) {
 		this.disabled = value;
+		this._toggleDesklet();
+	},
+
+	on_overridesCheckbox_toggled: function (checkbox, value) {
+		this.overridesEnabled = value;
 		this._toggleDesklet();
 	},
 
