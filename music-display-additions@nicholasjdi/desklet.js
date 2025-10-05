@@ -512,13 +512,13 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	_positionLabel: function () {
 		// run on idle so label size is known
-		this._posTimeout = GLib.timeout_add(
+		let timeout = this._posTimeout = GLib.timeout_add(
 			GLib.PRIORITY_DEFAULT_IDLE,
 			0,
 			Lang.bind(this, function () {
-				if (this._posTimeout) {
-					GLib.source_remove(this._posTimeout);
-					this._posTimeout = null;
+				if (timeout) {
+					GLib.source_remove(timeout);
+					timeout = null;
 				}
 				if (this.textEnabled) this.timeLabel.show();
 				else {
