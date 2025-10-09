@@ -528,7 +528,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 				let position = this.position;
 				let xOffset = this.xOffset;
 				let yOffset = this.yOffset;
-				if (this.artEnabled && !this.art.visible) {
+				if ((this.artEnabled || this._failArt) && !this.art.visible) {
 					position = this.noArtPosition;
 					xOffset = this.noArtXOffset;
 					yOffset = this.noArtYOffset;
