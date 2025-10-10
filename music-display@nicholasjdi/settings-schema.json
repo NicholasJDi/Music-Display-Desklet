@@ -114,8 +114,23 @@
 		"description": "Previous button texture",
 		"default": ""
 	},
-
 	"head4": {
+		"type": "header",
+		"description": "Tag Settings"
+	},
+	"mix_detection": {
+		"type": "checkbox",
+		"description": "Mix Detection",
+		"default": false,
+		"tooltip": "Check 'xesam:comment' for lines formatted as \"[(hours):(minutes):(seconds)]: (Title)\"\n\nIf these lines exist it will replace the %title% with the provided title.\nAdditionally when enabled, the %()mix()% tag can be used to grab the xesam:title (not implemented currently), if no timestamp lines are provided it will return an empty string.\n\nWARNING: This can decrease performance a LOT (mostly when on a mix track due to it having to update every poll)"
+	},
+	"empty_values": {
+		"type": "entry",
+		"description": "Empty Values",
+		"default": "Unknown,None,N/A,0",
+		"tooltip":"Comma-separated list of values to treat as NULL in custom format tags"
+	},
+	"head5": {
 		"type": "header",
 		"description": "Player Settings"
 	},
@@ -148,13 +163,7 @@
 		"description": "Treat whitelist as blacklist instead",
 		"default": false
 	},
-	"empty_values": {
-		"type": "entry",
-		"description": "Empty Values",
-		"default": "Unknown,None,N/A,0",
-		"tooltip":"Comma-separated list of values to treat as NULL in custom format tags"
-	},
-	"head5": {
+	"head6": {
 		"type": "header",
 		"description": ""
 	},

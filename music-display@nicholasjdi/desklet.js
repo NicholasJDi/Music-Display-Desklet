@@ -32,6 +32,9 @@ MusicDisplayDesklet.prototype = {
 		this.line1_stopped = "Player %player% is stopped";
 		this.line2_stopped = "";
 
+		this.mixDetection = false;
+		this.emptyValues = "Unknown,None,N/A,0"
+
 		this.hideSkipButtons = false;
 		this.hideAllButtons = false;
 		this.buttonTextSpacing = 7;
@@ -41,7 +44,7 @@ MusicDisplayDesklet.prototype = {
 		this.treatWhitelistAsBlacklist = false;
 		this.pollInterval = 1;
 		this.idlePollInterval = 3;
-		this.emptyValues = "Unknown,None,N/A,0"
+
 		this.debugMode = false;
 
 		this.btnPlayTexture = basePath + "play.png";
@@ -54,6 +57,7 @@ MusicDisplayDesklet.prototype = {
 		this._lastPlayPauseFile = null;
 		this._lastMetadataDump = null;
 		this._currentPlayer = null;
+		this._lastText = null;
 
 		// Polling
 		this._currentInterval = null;
@@ -153,21 +157,21 @@ MusicDisplayDesklet.prototype = {
 		const settings = this.settings;
 		const bind = Lang.bind;
 
-		// Line 1
+		// Line 1 settings
 		settings.bind("line1_format", "line1Format", bind(this, this._updateAll));
 		settings.bind("line1_font", "line1Font", bind(this, this._updateAll));
 		settings.bind("line1_color", "line1Color", bind(this, this._updateAll));
 		settings.bind("line1_no_player", "line1_no_player", bind(this, this._updateStatus));
 		settings.bind("line1_stopped", "line1_stopped", bind(this, this._updateStatus));
 
-		// Line 2
+		// Line 2 settings
 		settings.bind("line2_format", "line2Format", bind(this, this._updateAll));
 		settings.bind("line2_font", "line2Font", bind(this, this._updateAll));
 		settings.bind("line2_color", "line2Color", bind(this, this._updateAll));
 		settings.bind("line2_no_player", "line2_no_player", bind(this, this._updateStatus));
 		settings.bind("line2_stopped", "line2_stopped", bind(this, this._updateStatus));
 
-		// Buttons
+		// Button settings
 		settings.bind("btn_play_texture", "btnPlayTexture", bind(this, this._updateAll));
 		settings.bind("btn_pause_texture", "btnPauseTexture", bind(this, this._updateAll));
 		settings.bind("btn_next_texture", "btnNextTexture", bind(this, this._updateAll));
@@ -177,13 +181,17 @@ MusicDisplayDesklet.prototype = {
 		settings.bind("button_text_spacing", "buttonTextSpacing", bind(this, this._updateAll));
 		settings.bind("button_size", "buttonSize", bind(this, this._updateAll));
 
+		// Tag settings
+		settings.bind("mix_detection", "mixDetection", bind(this, this._updateAll));
+		settings.bind("empty_values", "emptyValues", bind(this, this._updateAll));
+
 		// Player settings
 		settings.bind("player_whitelist", "playerWhitelist", bind(this, this._updateAll));
 		settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", bind(this, this._updateAll));
 		settings.bind("poll_interval", "pollInterval", bind(this, this._resetPolling));
 		settings.bind("idle_poll_interval", "idlePollInterval", bind(this, this._resetPolling));
-		settings.bind("empty_values", "emptyValues", bind(this, this._updateAll));
-		settings.bind("debug_mode", "debugMode", bind(this, this._updateAll));
+
+		settings.bind("debug_mode", "debugMode", null);
 	},
 
 	_startPolling: function(interval) {
@@ -210,6 +218,7 @@ MusicDisplayDesklet.prototype = {
 		this.labelTitle.set_text("Loading...");
 		this.labelArtist.set_text("");
 		this._lastStatus = "Reload";
+		this._lastText = null;
 		this._updateFont();
 		this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
 	},
@@ -252,7 +261,7 @@ MusicDisplayDesklet.prototype = {
 			'font-style: ' + styleStr2 + '; ' +
 			'font-size: ' + size2 + 'pt; ' +
 			'color: ' + this.line2Color + ';';
-		
+
 		if (this.debugMode) {
 		global.log(`[music-display@nicholasjdi] Update font`);
 		}
@@ -458,42 +467,149 @@ MusicDisplayDesklet.prototype = {
 	},
 
 	_updateText: function(playerName) {
-		const fields = ['xesam:title', 'xesam:artist', 'xesam:album'];
-		const results = {};
-		let pending = fields.length;
+		try {
+			const fields = ['xesam:title', 'xesam:artist', 'xesam:album'];
+			const results = {};
+			let pending = fields.length;
 
-		fields.forEach(field => {
-			this._runPlayerctlAsync(['metadata', field], val => {
-				results[field] = val || (field === 'xesam:title' ? "Unknown Title" : field === 'xesam:artist' ? "Unknown Artist" : "Unknown Album");
-				pending--;
-				if (pending === 0) {
-					// all metadata fetched, now build the display text
-					const title = results['xesam:title'];
-					const artist = results['xesam:artist'];
-					const album = results['xesam:album'];
+			fields.forEach(field => {
+				this._runPlayerctlAsync(['metadata', field], val => {
+					results[field] = val || (field === 'xesam:title' ? "Unknown Title" : field === 'xesam:artist' ? "Unknown Artist" : "Unknown Album");
+					pending--;
+					if (pending === 0) {
+						// all metadata fetched, now build the display text
+						if (this.mixDetection) {
+							this._runPlayerctlAsync(['metadata', 'xesam:comment'], textOut => {
+								this._runPlayerctlAsync(['position'], timeOut => {
+									const text = textOut || null;
+									const time = timeOut || null;
+									const mixTitle = this._grabMixTitleOverride(text, time);
+									const title = mixTitle ? mixTitle : results['xesam:title'];
 
-					if (this.debugMode) {
-						global.log(`[music-display@nicholasjdi] Resetting text, ${title}, ${artist}, ${album}, ${playerName}.`);
+									// i hate this but i can't figure out a better way. just annoying code though, not anoy performance loss.
+									const artist = results['xesam:artist'];
+									const album = results['xesam:album'];
+
+									
+									let base1 = this.line1Format
+										.replaceAll('%title%', title)
+										.replaceAll('%artist%', artist)
+										.replaceAll('%album%', album)
+										.replaceAll('%player%', playerName);
+
+									let base2 = this.line2Format
+									.replaceAll('%title%', title)
+									.replaceAll('%artist%', artist)
+									.replaceAll('%album%', album)
+									.replaceAll('%player%', playerName);
+									
+									// handle custom tags
+									this._fetchCustomTagsAsync(base1, final1 => {
+										this._fetchCustomTagsAsync(base2, final2 => {
+											const currentText = `${final1},${final2}`
+											if (this._lastText != currentText) {
+												if (this.debugMode) {
+													global.log(`[music-display@nicholasjdi] Resetting text with mix detection, ${title}, ${artist}, ${album}, ${playerName}.`);
+												}
+												this._lastText = currentText
+												this.labelTitle.set_text(final1);
+												this.labelArtist.set_text(final2);
+											}
+										});
+									});
+								});
+							});
+						} else {
+							const title = results['xesam:title'];
+							const artist = results['xesam:artist'];
+							const album = results['xesam:album'];
+
+							
+							let base1 = this.line1Format
+								.replaceAll('%title%', title)
+								.replaceAll('%artist%', artist)
+								.replaceAll('%album%', album)
+								.replaceAll('%player%', playerName);
+								
+							let base2 = this.line2Format
+								.replaceAll('%title%', title)
+								.replaceAll('%artist%', artist)
+								.replaceAll('%album%', album)
+								.replaceAll('%player%', playerName);
+								
+							// handle custom tags
+							this._fetchCustomTagsAsync(base1, final1 => {
+								this._fetchCustomTagsAsync(base2, final2 => {
+									const currentText = `${final1},${final2}`
+									if (this._lastText != currentText) {
+										if (this.debugMode) {
+											global.log(`[music-display@nicholasjdi] Resetting text, ${title}, ${artist}, ${album}, ${playerName}.`);
+										}
+										this._lastText = currentText;
+										this.labelTitle.set_text(final1);
+										this.labelArtist.set_text(final2);
+									}
+								});
+							});
+						}
 					}
-
-					let base1 = this.line1Format
-						.replace('%title%', title)
-						.replace('%artist%', artist)
-						.replace('%album%', album)
-						.replace('%player%', playerName);
-
-					let base2 = this.line2Format
-						.replace('%title%', title)
-						.replace('%artist%', artist)
-						.replace('%album%', album)
-						.replace('%player%', playerName);
-
-					// handle custom tags
-					this._fetchCustomTagsAsync(base1, final1 => {this.labelTitle.set_text(final1);});
-					this._fetchCustomTagsAsync(base2, final2 => {this.labelArtist.set_text(final2);});
-				}
+				});
 			});
-		});
+		} catch (e) {
+			global.logError(`[music-display@nicholasjdi] _updateText exception: ${e}`);
+		}
+	},
+
+	_grabMixTitleOverride: function (text, time) {
+		try {
+			if (!text || text == "") return null;
+			if (!time) return null;
+
+			// Parse timestamped lines
+			const lines = text.split(/\r?\n/);
+			const entries = [];
+		
+			for (const line of lines) {
+				const match = line.match(/\[(.*?)\]:\s*(.*)/);
+				if (match) {
+					const [, timestamp, title] = match;
+					let secs = null;
+				
+					if (typeof timestamp === "number") secs = timestamp;
+					const parts = String(timestamp)
+						.trim()
+						.split(":")
+						.filter(Boolean)
+						.map(p => Number(p.trim()));
+
+					if (parts.some(isNaN)) secs = NaN;
+					let seconds = 0;
+					let multiplier = 1;
+					for (let i = parts.length - 1; i >= 0; i--) {
+						seconds += parts[i] * multiplier;
+						multiplier *= 60;
+						}
+					secs = seconds;
+					if (!isNaN(secs)) {
+						entries.push({ time: secs, title: title.trim() });
+					}
+				}
+			}
+
+			// Sort by time just in case
+			entries.sort((a, b) => a.time - b.time);
+
+			// Find the latest title at or before given time
+			let currentTitle = null;
+			for (const entry of entries) {
+				if (time >= entry.time) currentTitle = entry.title;
+				else break;
+			}
+
+			return currentTitle;
+		} catch (e) {
+			global.logError(`[music-display@nicholasjdi] _grabMixTitleOverride exception: ${e}`);
+		}
 	},
 
 	_updateStatus: function() {
@@ -583,7 +699,21 @@ MusicDisplayDesklet.prototype = {
 								const isPlaying = (status === "Playing");
 								this._updateButtonTextures(isPlaying);
 							} else {
-								if (this.debugMode) {
+								if (this.mixDetection) {
+									this._runPlayerctlAsync(['metadata','xesam:comment'], comment => {
+										if (comment.includes('[') && comment.includes(']: ')) {
+											if (this.debugMode) {
+												global.log(`[music-display@nicholasjdi] text update triggered because the track is a mix`);
+											}
+										
+											this._updateText(firstPlayer);
+										} else {
+											if (this.debugMode) {
+												global.log(`[music-display@nicholasjdi] no change in metadata/status, (and track is not a mix) skipping update`);
+											}
+										}
+									});
+								} else if (this.debugMode) {
 									global.log(`[music-display@nicholasjdi] no change in metadata/status, skipping update`);
 								}
 							}
