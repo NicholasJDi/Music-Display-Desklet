@@ -58,6 +58,8 @@ MusicDisplayDesklet.prototype = {
 		this._lastMetadataDump = null;
 		this._currentPlayer = null;
 		this._lastText = null;
+		this._lastMixTitle = null;
+
 
 		// Polling
 		this._currentInterval = null;
@@ -466,99 +468,56 @@ MusicDisplayDesklet.prototype = {
 		processNext();
 	},
 
-	_updateText: function(playerName) {
-		try {
-			const fields = ['xesam:title', 'xesam:artist', 'xesam:album'];
-			const results = {};
-			let pending = fields.length;
+	_updateText: function(playerName, titleOverride = null) {
+	    try {
+	        const fields = ['xesam:title', 'xesam:artist', 'xesam:album'];
+	        const results = {};
+	        let pending = fields.length;
 
-			fields.forEach(field => {
-				this._runPlayerctlAsync(['metadata', field], val => {
-					results[field] = val || (field === 'xesam:title' ? "Unknown Title" : field === 'xesam:artist' ? "Unknown Artist" : "Unknown Album");
-					pending--;
-					if (pending === 0) {
-						// all metadata fetched, now build the display text
-						if (this.mixDetection) {
-							this._runPlayerctlAsync(['metadata', 'xesam:comment'], textOut => {
-								this._runPlayerctlAsync(['position'], timeOut => {
-									const text = textOut || null;
-									const time = timeOut || null;
-									const mixTitle = this._grabMixTitleOverride(text, time);
-									const title = mixTitle ? mixTitle : results['xesam:title'];
+	        fields.forEach(field => {
+	            this._runPlayerctlAsync(['metadata', field], val => {
+	                results[field] = val || 
+	                    (field === 'xesam:title' ? "Unknown Title" :
+	                    field === 'xesam:artist' ? "Unknown Artist" : "Unknown Album");
+	                pending--;
+	                if (pending === 0) {
+	                    const title = titleOverride || results['xesam:title'];
+	                    const artist = results['xesam:artist'];
+	                    const album = results['xesam:album'];
 
-									// i hate this but i can't figure out a better way. just annoying code though, not anoy performance loss.
-									const artist = results['xesam:artist'];
-									const album = results['xesam:album'];
+	                    let base1 = this.line1Format
+	                        .replaceAll('%title%', title)
+	                        .replaceAll('%artist%', artist)
+	                        .replaceAll('%album%', album)
+	                        .replaceAll('%player%', playerName);
 
-									
-									let base1 = this.line1Format
-										.replaceAll('%title%', title)
-										.replaceAll('%artist%', artist)
-										.replaceAll('%album%', album)
-										.replaceAll('%player%', playerName);
+	                    let base2 = this.line2Format
+	                        .replaceAll('%title%', title)
+	                        .replaceAll('%artist%', artist)
+	                        .replaceAll('%album%', album)
+	                        .replaceAll('%player%', playerName);
 
-									let base2 = this.line2Format
-									.replaceAll('%title%', title)
-									.replaceAll('%artist%', artist)
-									.replaceAll('%album%', album)
-									.replaceAll('%player%', playerName);
-									
-									// handle custom tags
-									this._fetchCustomTagsAsync(base1, final1 => {
-										this._fetchCustomTagsAsync(base2, final2 => {
-											const currentText = `${final1},${final2}`
-											if (this._lastText != currentText) {
-												if (this.debugMode) {
-													global.log(`[music-display@nicholasjdi] Resetting text with mix detection, ${title}, ${artist}, ${album}, ${playerName}.`);
-												}
-												this._lastText = currentText
-												this.labelTitle.set_text(final1);
-												this.labelArtist.set_text(final2);
-											}
-										});
-									});
-								});
-							});
-						} else {
-							const title = results['xesam:title'];
-							const artist = results['xesam:artist'];
-							const album = results['xesam:album'];
-
-							
-							let base1 = this.line1Format
-								.replaceAll('%title%', title)
-								.replaceAll('%artist%', artist)
-								.replaceAll('%album%', album)
-								.replaceAll('%player%', playerName);
-								
-							let base2 = this.line2Format
-								.replaceAll('%title%', title)
-								.replaceAll('%artist%', artist)
-								.replaceAll('%album%', album)
-								.replaceAll('%player%', playerName);
-								
-							// handle custom tags
-							this._fetchCustomTagsAsync(base1, final1 => {
-								this._fetchCustomTagsAsync(base2, final2 => {
-									const currentText = `${final1},${final2}`
-									if (this._lastText != currentText) {
-										if (this.debugMode) {
-											global.log(`[music-display@nicholasjdi] Resetting text, ${title}, ${artist}, ${album}, ${playerName}.`);
-										}
-										this._lastText = currentText;
-										this.labelTitle.set_text(final1);
-										this.labelArtist.set_text(final2);
-									}
-								});
-							});
-						}
-					}
-				});
-			});
-		} catch (e) {
-			global.logError(`[music-display@nicholasjdi] _updateText exception: ${e}`);
-		}
+	                    this._fetchCustomTagsAsync(base1, final1 => {
+	                        this._fetchCustomTagsAsync(base2, final2 => {
+	                            const currentText = `${final1},${final2}`;
+	                            if (this._lastText !== currentText) {
+	                                if (this.debugMode) {
+	                                    global.log(`[music-display@nicholasjdi] Updating text: ${title}, ${artist}, ${album}, ${playerName}.`);
+	                                }
+	                                this._lastText = currentText;
+	                                this.labelTitle.set_text(final1);
+	                                this.labelArtist.set_text(final2);
+	                            }
+	                        });
+	                    });
+	                }
+	            });
+	        });
+	    } catch (e) {
+	        global.logError(`[music-display@nicholasjdi] _updateText exception: ${e}`);
+	    }
 	},
+
 
 	_grabMixTitleOverride: function (text, time) {
 		try {
@@ -695,18 +654,39 @@ MusicDisplayDesklet.prototype = {
 								}
 
 								// Now update text/buttons
-								this._updateText(firstPlayer);
+								this._lastMixTitle = null;
+								// yes this is a stupid way to do this but i can't think of a better way
+								if (this.mixDetection) {
+									this._runPlayerctlAsync(['metadata','xesam:comment'], comment => {
+										if (comment.includes('[') && comment.includes(']: ')) {
+											this._runPlayerctlAsync(['position'], time => {
+												const mixTitle = this._grabMixTitleOverride(comment,time)
+												if (mixTitle != this._lastMixTitle) {
+													this._lastMixTitle = mixTitle
+													this._updateText(firstPlayer, mixTitle);
+												}
+											});
+										} else this._updateText(firstPlayer);
+									});
+								} else this._updateText(firstPlayer);
 								const isPlaying = (status === "Playing");
 								this._updateButtonTextures(isPlaying);
 							} else {
 								if (this.mixDetection) {
 									this._runPlayerctlAsync(['metadata','xesam:comment'], comment => {
 										if (comment.includes('[') && comment.includes(']: ')) {
-											if (this.debugMode) {
-												global.log(`[music-display@nicholasjdi] text update triggered because the track is a mix`);
-											}
-										
-											this._updateText(firstPlayer);
+											this._runPlayerctlAsync(['position'], time => {
+												if (this.debugMode) {
+													global.log(`[music-display@nicholasjdi] text update triggered because the track is a mix`);
+												}
+												const mixTitle = this._grabMixTitleOverride(comment,time)
+												if (mixTitle != this._lastMixTitle) {
+													this._lastMixTitle = mixTitle
+													this._updateText(firstPlayer, mixTitle);
+												}
+											});
+
+
 										} else {
 											if (this.debugMode) {
 												global.log(`[music-display@nicholasjdi] no change in metadata/status, (and track is not a mix) skipping update`);
