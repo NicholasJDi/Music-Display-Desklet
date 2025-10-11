@@ -164,6 +164,13 @@
 		"select-dir" : true,
 		"dependency": "overrides_enabled"
 	},
+	"mix_detection": {
+		"type": "checkbox",
+		"description": "Mix Detection",
+		"default": false,
+		"tooltip": "Check 'xesam:comment' for lines formatted as \"[(hours):(minutes):(seconds)]: (Title)\"\n\nIf these lines exist it will use the provided title for overides.\n(this can also be used to set overrides that do not rely on xesam:title which is nice.)\n\nWARNING: This can decrease performance a LOT.",
+		"dependency": "overrides_enabled"
+	},
 	"head4": {
 		"type": "header",
 		"description": "Player Settings"

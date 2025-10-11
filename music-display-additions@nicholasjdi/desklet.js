@@ -40,6 +40,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.debugMode = false;
 		this.overridesEnabled = false;
 		this.overridesDirectory = "";
+		this.mixDetection = false;
 		this.disabled = false;
 		this.noArtPosition = "top_right";
 		this.noArtXOffset = -4;
@@ -52,7 +53,9 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this._lastStatus = null;
 		this._lastTimeText = null;
 		this._soupSession = new Soup.Session();
+		this._pollTimer = null;
 		this._failArt = false;
+		this._lastMixTitle = null;
 
 		// build container
 		this.container = new St.Widget({ reactive: true });
@@ -85,14 +88,15 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.settings.bind("font", "font", bind(this, this._updateFont));
 		this.settings.bind("color", "color", bind(this, this._updateFont));
 		this.settings.bind("text_enabled", "textEnabled", bind(this, this._updateTime));
-		this.settings.bind("art_enabled", "artEnabled", bind(this, this._updateArt));
+		this.settings.bind("art_enabled", "artEnabled", bind(this, this._updateStatus));
 		this.settings.bind("poll_interval", "pollInterval", bind(this, this._resetPolling));
 		this.settings.bind("idle_poll_interval", "idlePollInterval", bind(this, this._resetPolling));
 		this.settings.bind("player_whitelist", "playerWhitelist", bind(this, this._updateStatus));
 		this.settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", bind(this, this._updateStatus));
 		this.settings.bind("debug_mode", "debugMode", null);
 		this.settings.bind("overrides_enabled", "overridesEnabled", bind(this, this._toggleDesklet));
-		this.settings.bind("art_dir", "overridesDirectory", bind(this, this._updateArt));
+		this.settings.bind("art_dir", "overridesDirectory", bind(this, this._updateStatus));
+		this.settings.bind("mix_detection", "mixDetection", bind(this, this._toggleDesklet));
 		this.settings.bind("disabled", "disabled", bind(this, this._toggleDesklet));
 		this.settings.bind("no_art_position", "noArtPosition", bind(this, this._positionLabel));
 		this.settings.bind("no_art_x_offset", "noArtXOffset", bind(this, this._positionLabel));
@@ -134,6 +138,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		}
 		this._lastStatus = null;
 		this._lastMetadataDump = null;
+		this._lastMixTitle = null;
 		this._updateStatus();
 		this._resetPolling();
 	},
@@ -192,6 +197,58 @@ MusicDisplayAdditionsDesklet.prototype = {
 		}
 	},
 
+	_grabMixTitleOverride: function (text, time) {
+		try {
+			if (!text || text == "") return null;
+			if (!time) return null;
+
+			// Parse timestamped lines
+			const lines = text.split(/\r?\n/);
+			const entries = [];
+		
+			for (const line of lines) {
+				const match = line.match(/\[(.*?)\]:\s*(.*)/);
+				if (match) {
+					const [, timestamp, title] = match;
+					let secs = null;
+				
+					if (typeof timestamp === "number") secs = timestamp;
+					const parts = String(timestamp)
+						.trim()
+						.split(":")
+						.filter(Boolean)
+						.map(p => Number(p.trim()));
+
+					if (parts.some(isNaN)) secs = NaN;
+					let seconds = 0;
+					let multiplier = 1;
+					for (let i = parts.length - 1; i >= 0; i--) {
+						seconds += parts[i] * multiplier;
+						multiplier *= 60;
+						}
+					secs = seconds;
+					if (!isNaN(secs)) {
+						entries.push({ time: secs, title: title.trim() });
+					}
+				}
+			}
+
+			// Sort by time just in case
+			entries.sort((a, b) => a.time - b.time);
+
+			// Find the latest title at or before given time
+			let currentTitle = null;
+			for (const entry of entries) {
+				if (time >= entry.time) currentTitle = entry.title;
+				else break;
+			}
+
+			return currentTitle;
+		} catch (e) {
+			global.logError(`[music-display-additions@nicholasjdi] _grabMixTitleOverride exception: ${e}`);
+		}
+	},
+
 	_updateStatus: function () {
 		try {
 			this._runPlayerctlAsync(['status'], statusOut => {
@@ -232,12 +289,40 @@ MusicDisplayAdditionsDesklet.prototype = {
 								if (this.debugMode) {
 									global.log(`[music-display-additions@nicholasjdi] art update triggered (statusChanged=${statusChanged}, metadataChanged=${metadataChanged})`);
 								}
-							
-								this._updateArt();
-							} else {
-								if (this.debugMode) {
-									global.log(`[music-display-additions@nicholasjdi] no change in metadata/status, skipping art update`);
-								}
+								this._lastMixTitle = null;
+								// yes this is a stupid way to do this but i can't think of a better way
+								if (this.mixDetection && this.overridesEnabled) {
+									this._runPlayerctlAsync(['metadata','xesam:comment'], comment => {
+										if (comment.includes('[') && comment.includes(']: ')) {
+											this._runPlayerctlAsync(['position'], time => {
+												const mixTitle = this._grabMixTitleOverride(comment,time);
+												this._lastMixTitle = mixTitle;
+												this._updateArt(mixTitle);
+											});
+										} else this._updateArt();
+									});
+								} else this._updateArt();
+							} else if (this.mixDetection && this.overridesEnabled) {
+								this._runPlayerctlAsync(['metadata','xesam:comment'], comment => {
+									if (comment.includes('[') && comment.includes(']: ')) {
+										this._runPlayerctlAsync(['position'], time => {
+											const mixTitle = this._grabMixTitleOverride(comment,time);
+											if (mixTitle != this._lastMixTitle) {
+												if (this.debugMode) {
+													global.log(`[music-display-additions@nicholasjdi] art update triggered because the track is a mix`);
+												}
+												this._lastMixTitle = mixTitle;
+												this._updateArt(mixTitle);
+											}
+										});
+									} else {
+										if (this.debugMode) {
+											global.log(`[music-display-additions@nicholasjdi] no change in metadata/status, (and track is not a mix) skipping art update`);
+										}
+									}
+								});
+							} else if (this.debugMode) {
+								global.log(`[music-display-additions@nicholasjdi] no change in metadata/status, skipping art update`);
 							}
 						});
 					} else this._setArt("");
@@ -300,7 +385,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		}
 	},
 
-	_updateArt: function () {
+	_updateArt: function (artOverrideTitleOverride = null) {
 		try {
 			this._runPlayerctlAsync(['metadata', "mpris:artUrl"], artUrlOut => {
 				let artUrl = artUrlOut;
@@ -311,8 +396,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 					this._runPlayerctlAsync(['metadata', 'xesam:artist'], artist => {
 						this._runPlayerctlAsync(['metadata', 'xesam:title'], title => {
 							let safeArtist = (artist || 'unknown').replace(/[/\\?%*:|"<>]/g, '_');
-							let safeTitle = (title || 'unknown').replace(/[/\\?%*:|"<>]/g, '_');
-
+							let safeTitle = (artOverrideTitleOverride ? artOverrideTitleOverride : (title || 'unknown')).replace(/[/\\?%*:|"<>]/g, '_');
 							const exts = ['png','jpg','jpeg','webp'];
 							for (let ext of exts) {
 								let candidate = GLib.build_filenamev([this.overridesDirectory, `${safeArtist} - ${safeTitle}.${ext}`]);
