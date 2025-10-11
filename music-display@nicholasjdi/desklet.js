@@ -660,42 +660,38 @@ MusicDisplayDesklet.prototype = {
 									this._runPlayerctlAsync(['metadata','xesam:comment'], comment => {
 										if (comment.includes('[') && comment.includes(']: ')) {
 											this._runPlayerctlAsync(['position'], time => {
-												const mixTitle = this._grabMixTitleOverride(comment,time)
-												if (mixTitle != this._lastMixTitle) {
-													this._lastMixTitle = mixTitle
-													this._updateText(firstPlayer, mixTitle);
-												}
+												const mixTitle = this._grabMixTitleOverride(comment,time);
+												this._lastMixTitle = mixTitle;
+												this._updateText(firstPlayer, mixTitle);
 											});
 										} else this._updateText(firstPlayer);
 									});
 								} else this._updateText(firstPlayer);
 								const isPlaying = (status === "Playing");
 								this._updateButtonTextures(isPlaying);
-							} else {
-								if (this.mixDetection) {
-									this._runPlayerctlAsync(['metadata','xesam:comment'], comment => {
-										if (comment.includes('[') && comment.includes(']: ')) {
-											this._runPlayerctlAsync(['position'], time => {
+							} else if (this.mixDetection) {
+								this._runPlayerctlAsync(['metadata','xesam:comment'], comment => {
+									if (comment.includes('[') && comment.includes(']: ')) {
+										this._runPlayerctlAsync(['position'], time => {
+											const mixTitle = this._grabMixTitleOverride(comment,time);
+											if (mixTitle != this._lastMixTitle) {
 												if (this.debugMode) {
 													global.log(`[music-display@nicholasjdi] text update triggered because the track is a mix`);
 												}
-												const mixTitle = this._grabMixTitleOverride(comment,time)
-												if (mixTitle != this._lastMixTitle) {
-													this._lastMixTitle = mixTitle
-													this._updateText(firstPlayer, mixTitle);
-												}
-											});
-
-
-										} else {
-											if (this.debugMode) {
-												global.log(`[music-display@nicholasjdi] no change in metadata/status, (and track is not a mix) skipping update`);
+												this._lastMixTitle = mixTitle;
+												this._updateText(firstPlayer, mixTitle);
 											}
+										});
+
+
+									} else {
+										if (this.debugMode) {
+											global.log(`[music-display@nicholasjdi] no change in metadata/status, (and track is not a mix) skipping update`);
 										}
-									});
-								} else if (this.debugMode) {
-									global.log(`[music-display@nicholasjdi] no change in metadata/status, skipping update`);
-								}
+									}
+								});
+							} else if (this.debugMode) {
+								global.log(`[music-display@nicholasjdi] no change in metadata/status, skipping update`);
 							}
 						});
 					});
