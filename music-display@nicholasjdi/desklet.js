@@ -304,6 +304,12 @@ MusicDisplayDesklet.prototype = {
 	},
 
 	_fetchCustomTagsAsync: function(formatStr, callback) {
+		// Quick check: if it doesn't contain all required chars, return the string as-is
+		if (!formatStr.includes('%') || !formatStr.includes('(') || !formatStr.includes(')') || !formatStr.includes('[') || !formatStr.includes(']')) {
+			callback(formatStr);
+			return;
+		}
+
 		const emptyValues = (this.emptyValues || "").split(",").map(s => s.trim()).filter(Boolean);
 		let result = "";
 		let idx = 0;
