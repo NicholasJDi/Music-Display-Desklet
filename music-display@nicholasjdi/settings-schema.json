@@ -122,7 +122,7 @@
 		"type": "checkbox",
 		"description": "Mix Detection",
 		"default": false,
-		"tooltip": "Check 'xesam:comment' for lines formatted as \"[(hours):(minutes):(seconds)]: (Title)\"\n\nIf these lines exist it will replace the %title% with the provided title.\nAdditionally when enabled, the %()mix()% tag can be used to grab the xesam:title (not implemented currently), if no timestamp lines are provided it will return an empty string.\n\nWARNING: This can decrease performance a LOT."
+		"tooltip": "Check 'xesam:comment' for lines formatted as \"[(hours):(minutes):(seconds)]: (Title)\"\n\nIf these lines exist it will replace the %title% with the provided title.\nAdditionally when enabled, the %()mix()% tag can be used to grab the xesam:title, if no timestamp lines are provided it will return an empty string.\n\nWARNING: This can decrease performance a LOT."
 	},
 	"empty_values": {
 		"type": "entry",

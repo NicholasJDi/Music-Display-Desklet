@@ -304,12 +304,6 @@ MusicDisplayDesklet.prototype = {
 	},
 
 	_fetchCustomTagsAsync: function(formatStr, callback) {
-		// Quick check: if it doesn't contain all required chars, return the string as-is
-		if (!formatStr.includes('%') || !formatStr.includes('(') || !formatStr.includes(')') || !formatStr.includes('[') || !formatStr.includes(']')) {
-			callback(formatStr);
-			return;
-		}
-
 		const emptyValues = (this.emptyValues || "").split(",").map(s => s.trim()).filter(Boolean);
 		let result = "";
 		let idx = 0;
@@ -320,18 +314,17 @@ MusicDisplayDesklet.prototype = {
 				return;
 			}
 
-			let nextPercent = formatStr.indexOf('%', idx);
+			const nextPercent = formatStr.indexOf('%', idx);
 			if (nextPercent === -1) {
 				result += formatStr.slice(idx);
 				callback(result);
 				return;
 			}
 
-			// append text before %
 			result += formatStr.slice(idx, nextPercent);
 			idx = nextPercent;
 
-			// parse the full tag (respect parentheses so % inside (...) is ignored)
+			// find closing %
 			let stack = [];
 			let end = idx + 1;
 			let found = false;
@@ -348,98 +341,68 @@ MusicDisplayDesklet.prototype = {
 			}
 
 			if (!found) {
-				// invalid tag, just append the remaining text
 				result += formatStr.slice(idx);
 				callback(result);
 				return;
 			}
 
-			const tagContent = formatStr.slice(idx + 1, end); // between % and %
-			idx = end + 1; // move past closing %
+			const tagContent = formatStr.slice(idx + 1, end); // between %…%
+			idx = end + 1;
 
-			// --- Robust prefix/suffix extraction using stack-aware parsing ---
+			// --- stack-aware prefix extraction ---
 			let prefix = "", suffix = "", middle = tagContent;
 
-			// Extract prefix if it starts with '(' — find matching ')'
-			if (middle.startsWith('(')) {
-				let depth = 0;
-				for (let i = 0; i < middle.length; i++) {
-					const ch = middle[i];
-					if (ch === '(') depth++;
-					else if (ch === ')') {
-						depth--;
-						if (depth === 0) {
-							prefix = middle.slice(1, i);
-							middle = middle.slice(i + 1);
-							break;
-						}
-					}
+			if (middle[0] === '(') {
+				let depth = 1, i = 1;
+				while (i < middle.length && depth > 0) {
+					if (middle[i] === '(') depth++;
+					else if (middle[i] === ')') depth--;
+					i++;
 				}
+				prefix = middle.slice(1, i - 1); // remove surrounding ()
+				middle = middle.slice(i);		 // rest after prefix
 			}
 
-			// Extract suffix if it ends with ')' — find matching '('
-			if (middle.length && middle[middle.length - 1] === ')') {
-				let depth = 0;
-				for (let j = middle.length - 1; j >= 0; j--) {
-					const ch = middle[j];
-					if (ch === ')') depth++;
-					else if (ch === '(') {
-						depth--;
-						if (depth === 0) {
-							suffix = middle.slice(j + 1, middle.length - 1);
-							middle = middle.slice(0, j);
-							break;
-						}
-					}
+			// stack-aware suffix extraction
+			if (middle[middle.length - 1] === ')') {
+				let depth = 1, j = middle.length - 2;
+				while (j >= 0 && depth > 0) {
+					if (middle[j] === ')') depth++;
+					else if (middle[j] === '(') depth--;
+					j--;
 				}
+				suffix = middle.slice(j + 2, middle.length - 1); // remove surrounding ()
+				middle = middle.slice(0, j + 1);				 // rest before suffix
 			}
 
-			// Handle %[player]key% or %[]key%
-			const playerMatch = middle.match(/^\[(.*?)\](.*)$/);
-			let player = "";
-			let metadataKey = "";
-
-			if (playerMatch) {
-				player = playerMatch[1]; // may be empty
-				metadataKey = playerMatch[2];
-			} else {
-				// invalid format, skip tag
+			/// Extract [player]metadataKey
+			const playerMatch = middle.match(/^\s*\[(.*?)\](.*)$/);
+			if (!playerMatch) {
+				result += `%${tagContent}%`; // invalid format
 				processNext();
 				return;
 			}
 
-			if (!metadataKey) {
-				// invalid metadata:tag, skip tag
+			const player = playerMatch[1].trim();
+			const metadataKey = playerMatch[2].trim();
+
+			if (!metadataKey || (player && !player.includes(this._currentPlayer))) {
 				processNext();
 				return;
 			}
 
-			// decide which player to use
-			if (player === "") {
-				// user left [ ] empty: use current player from _updateStatus
-				player = this._currentPlayer || null;
-			} else {
-				// user specified a player name — only allow if it matches _currentPlayer
-				if (this._currentPlayer && player !== this._currentPlayer) {
-					// skip this tag entirely, no prefix/suffix
-					processNext();
-					return;
-				}
-			}
-
-			const fetchMetadata = (playerName) => {
+			// Fetch metadata
+			const fetchMetadata = () => {
 				let args = [];
-				if (playerName) args.push(`--player=${playerName}`);
+				if (this._currentPlayer) args.push(`--player=${this._currentPlayer}`);
 				args.push('metadata', metadataKey);
 
 				this._runPlayerctlAsync(args, val => {
 					if (!val || emptyValues.includes(val.trim())) {
-						// invalid metadata, skip processing prefix/suffix
 						processNext();
 						return;
 					}
 
-					// recursively process prefix and suffix
 					this._fetchCustomTagsAsync(prefix, finalPrefix => {
 						this._fetchCustomTagsAsync(suffix, finalSuffix => {
 							result += finalPrefix + val + finalSuffix;
@@ -449,75 +412,85 @@ MusicDisplayDesklet.prototype = {
 				});
 			};
 
-			// if player is null (no player yet), try first whitelist player
-			if (!player) {
-				this._runPlayerctlAsync(['-l'], playersOut => {
-					const firstPlayer = playersOut.split("\n").find(p => {
-						if (!p) return false;
-						if (!this.playerWhitelist || !this.playerWhitelist.trim()) return true;
-						const players = this.playerWhitelist.split(",").map(x => x.trim());
-						return this.treatWhitelistAsBlacklist ? !players.includes(p) : players.includes(p);
-					}) || "Player";
-					fetchMetadata(firstPlayer);
-				});
-			} else {
-				fetchMetadata(player);
-			}
+			if (player === "" || this._currentPlayer) fetchMetadata();
+			else processNext();
 		};
 
 		processNext();
 	},
 
 	_updateText: function(playerName, titleOverride = null) {
-	    try {
-	        const fields = ['xesam:title', 'xesam:artist', 'xesam:album'];
-	        const results = {};
-	        let pending = fields.length;
+		try {
+			const fields = ['xesam:title', 'xesam:artist', 'xesam:album'];
+			const results = {};
+			let pending = fields.length;
 
-	        fields.forEach(field => {
-	            this._runPlayerctlAsync(['metadata', field], val => {
-	                results[field] = val || 
-	                    (field === 'xesam:title' ? "Unknown Title" :
-	                    field === 'xesam:artist' ? "Unknown Artist" : "Unknown Album");
-	                pending--;
-	                if (pending === 0) {
-	                    const title = titleOverride || results['xesam:title'];
-	                    const artist = results['xesam:artist'];
-	                    const album = results['xesam:album'];
+			fields.forEach(field => {
+				this._runPlayerctlAsync(['metadata', field], val => {
+					results[field] = val ||
+						(field === 'xesam:title' ? "Unknown Title" :
+						field === 'xesam:artist' ? "Unknown Artist" : "Unknown Album");
+					pending--;
+					if (pending === 0) {
+						const title = titleOverride || results['xesam:title'];
+						const artist = results['xesam:artist'];
+						const album = results['xesam:album'];
 
-	                    let base1 = this.line1Format
-	                        .replaceAll('%title%', title)
-	                        .replaceAll('%artist%', artist)
-	                        .replaceAll('%album%', album)
-	                        .replaceAll('%player%', playerName);
+						let base1 = this.line1Format
+							.replaceAll('%title%', title)
+							.replaceAll('%artist%', artist)
+							.replaceAll('%album%', album)
+							.replaceAll('%player%', playerName);
 
-	                    let base2 = this.line2Format
-	                        .replaceAll('%title%', title)
-	                        .replaceAll('%artist%', artist)
-	                        .replaceAll('%album%', album)
-	                        .replaceAll('%player%', playerName);
+						let base2 = this.line2Format
+							.replaceAll('%title%', title)
+							.replaceAll('%artist%', artist)
+							.replaceAll('%album%', album)
+							.replaceAll('%player%', playerName);
 
-	                    this._fetchCustomTagsAsync(base1, final1 => {
-	                        this._fetchCustomTagsAsync(base2, final2 => {
-	                            const currentText = `${final1},${final2}`;
-	                            if (this._lastText !== currentText) {
-	                                if (this.debugMode) {
-	                                    global.log(`[music-display@nicholasjdi] Updating text: ${title}, ${artist}, ${album}, ${playerName}.`);
-	                                }
-	                                this._lastText = currentText;
-	                                this.labelTitle.set_text(final1);
-	                                this.labelArtist.set_text(final2);
-	                            }
-	                        });
-	                    });
-	                }
-	            });
-	        });
-	    } catch (e) {
-	        global.logError(`[music-display@nicholasjdi] _updateText exception: ${e}`);
-	    }
+						base1 = this._applyMixTags(base1, results['xesam:title']);
+						base2 = this._applyMixTags(base2, results['xesam:title']);
+
+						this._fetchCustomTagsAsync(base1, final1 => {
+							this._fetchCustomTagsAsync(base2, final2 => {
+								const currentText = `${final1},${final2}`;
+								if (this._lastText !== currentText) {
+									if (this.debugMode) {
+										global.log(`[music-display@nicholasjdi] Updating text: ${title}, ${artist}, ${album}, ${playerName}.`);
+									}
+									this._lastText = currentText;
+									this.labelTitle.set_text(final1);
+									this.labelArtist.set_text(final2);
+								}
+							});
+						});
+					}
+				});
+			});
+		} catch (e) {
+			global.logError(`[music-display@nicholasjdi] _updateText exception: ${e}`);
+		}
 	},
 
+	_applyMixTags: function(formatStr, normalTitle) {
+		// Only proceed if the mini-syntax might be present
+		if (!formatStr || formatStr.indexOf('%(') === -1 || formatStr.indexOf(')mix(') === -1) {
+			return formatStr;
+		}
+
+		// Matches %(prefix)mix(suffix)% (prefix/suffix may be empty)
+		return formatStr.replace(/%\(([^)]*?)\)mix\(([^)]*?)\)%/g, (match, prefix, suffix) => {
+			// If there is a current mix marker, show the normal title with the prefix/suffix
+			if (this._lastMixTitle != null) {
+				prefix = prefix || "";
+				suffix = suffix || "";
+				return prefix + (normalTitle || "") + suffix;
+			}
+
+			// Otherwise, remove the whole tag
+			return "";
+		});
+	},
 
 	_grabMixTitleOverride: function (text, time) {
 		try {
@@ -527,13 +500,13 @@ MusicDisplayDesklet.prototype = {
 			// Parse timestamped lines
 			const lines = text.split(/\r?\n/);
 			const entries = [];
-		
+
 			for (const line of lines) {
 				const match = line.match(/\[(.*?)\]:\s*(.*)/);
 				if (match) {
 					const [, timestamp, title] = match;
 					let secs = null;
-				
+
 					if (typeof timestamp === "number") secs = timestamp;
 					const parts = String(timestamp)
 						.trim()
