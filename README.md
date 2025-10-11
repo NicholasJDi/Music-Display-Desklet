@@ -15,7 +15,7 @@ Desklet looks like this by default:<br>
 You can fully configure both text lines, you can do something like this:<br>
 <img width="242" height="78" alt="Screenshot from 2025-09-08 08-50-30" src="https://github.com/user-attachments/assets/2858b670-cd22-4200-aea3-288e345a4a41" />
 
-For both lines you can change: format, font, and font size.
+For both lines you can change: format, font, font size, and font color.
 
 ### Format
 #### %title%
@@ -39,6 +39,16 @@ Run: `playerctl metadata` to show Metadata for the current Track.
 Using all of these tags we can set line 1 to "%title%" and set line 2 to "%(by )[]xesam:artist(%( - )[]xesam:album(%( #%()[]xesam:discNumber(-)%)[]xesam:trackNumber()%)%)%" to show:<br>
 <img width="402" height="68" alt="image" src="https://github.com/user-attachments/assets/6e3b9717-c992-4889-b1ea-9eeaa85620cc" /><br>
 for Rhythmbox, Firefox and Spotify. (i'm using rhythmbox in these examples. Note: VLC has really bad Metadata support, that's why its not referenced here.)
+### Tag Settings
+#### Mix Detection
+Check 'xesam:comment' for lines formatted as "[(hours):(minutes):(seconds)]: (Title)"
+
+If these lines exist it will replace the %title% with the provided title.<br>
+Additionally when enabled, the %()mix()% tag can be used to grab the xesam:title, if no timestamp lines are provided it will return an empty string.
+
+This can decrease performance a lot.
+#### Empty Values
+A Comma-separated list of Values to treat as `null` in Custom Format Tags (Unknown,None,N/A,0)
 ### Player Settings
 #### Track Polling Interval
 The Interval for how often Track data is updated. (Playing/Paused)
@@ -48,8 +58,6 @@ The Interval for how often Players are checked for. (No Player/Stopped)
 A Comma-separated list of allowed Players. (rhythmbox,spotify)
 #### Treat Whitelist As Blacklist
 Whether or not to treat the Whitelist as a Blacklist
-#### Empty Values
-A Comma-separated list of Values to treat as `null` in Custom Format Tags (Unknown,None,N/A,0)
 ### Button Settings
 #### Spacing
 The Space between the Buttons and the Text.
@@ -118,6 +126,13 @@ The Color above the Margin, behind Art. (for if Art is transparent)
 Whether or not Per Track Art Overrides are Enabled.
 #### Art Override Directory
 The Directory to fetch Art Overrides from, Files are formatted as "(Artist) - (Title).png" so "Lemmino - Cipher.png" for example. (jpg and webp are also supported.)
+#### Mix Detection
+Check 'xesam:comment' for lines formatted as "[(hours):(minutes):(seconds)]: (Title)"
+
+If these lines exist it will use the provided title for overides.<br>
+(this can also be used to set overrides that do not rely on xesam:title which is nice.)
+
+This can decrease performance a lot.
 ### Player Settings
 #### Time Polling Interval
 How often the Desklet checks Time and Art. (lower values make time grabbing more accurate)
