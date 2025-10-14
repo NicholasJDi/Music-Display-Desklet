@@ -582,6 +582,7 @@ MusicDisplayDesklet.prototype = {
 					this.labelTitle.set_text(this.line1_no_player);
 					this.labelArtist.set_text(this.line2_no_player);
 					showButtons = false;
+					this._lastText = null;
 				} else if (status === "Stopped") {
 					// Player stopped
 					this._runPlayerctlAsync(['-l'], playersOut => {
@@ -590,6 +591,7 @@ MusicDisplayDesklet.prototype = {
 						this.labelArtist.set_text(this.line2_stopped.replace('%player%', firstPlayer));
 					});
 					showButtons = false;
+					this._lastText = null;
 				} else {
 					// Playing / Paused
 					this._runPlayerctlAsync(['-l'], playersOut => {
@@ -636,7 +638,7 @@ MusicDisplayDesklet.prototype = {
 								this._lastMixTitle = null;
 								// yes this is a stupid way to do this but i can't think of a better way
 								if (this.mixDetection) {
-									this._runPlayerctlAsync(['metadata','xesam:comment'], comment => {
+									this._runPlayerctlAsync(['metadata','xesam:comment',`--player=${firstPlayer}`], comment => {
 										if (comment.includes('[') && comment.includes(']: ')) {
 											this._runPlayerctlAsync(['position'], time => {
 												const mixTitle = this._grabMixTitleOverride(comment,time);
@@ -649,7 +651,7 @@ MusicDisplayDesklet.prototype = {
 								const isPlaying = (status === "Playing");
 								this._updateButtonTextures(isPlaying);
 							} else if (this.mixDetection) {
-								this._runPlayerctlAsync(['metadata','xesam:comment'], comment => {
+								this._runPlayerctlAsync(['metadata','xesam:comment',`--player=${firstPlayer}`], comment => {
 									if (comment.includes('[') && comment.includes(']: ')) {
 										this._runPlayerctlAsync(['position'], time => {
 											const mixTitle = this._grabMixTitleOverride(comment,time);
