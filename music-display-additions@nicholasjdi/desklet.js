@@ -408,6 +408,10 @@ MusicDisplayAdditionsDesklet.prototype = {
 									break;
 								}
 							}
+							if (artUrl == artUrlOut && artOverrideTitleOverride) {
+								this._updateArt();
+								return;
+							}
 							this._setArt(artUrl);
 						});
 					});
