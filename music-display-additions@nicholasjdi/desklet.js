@@ -45,6 +45,9 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.noArtPosition = "top_right";
 		this.noArtXOffset = -4;
 		this.noArtYOffset = 4;
+		this.outlineEnabled = false;
+		this.outlineSize = "4";
+		this.outlineColor = "black";
 
 		this._hideArt = true;
 		this._artSize = null;
@@ -69,7 +72,21 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.art = new St.Icon({ icon_size: this.xSize });
 		this.container.add_actor(this.art);
 
-		// single time label
+		// outline labels
+		this.outlineContainer = new St.Widget({ reactive: true });
+		this.container.add_actor(this.outlineContainer);
+
+		this.outlineLabels = [
+			new St.Label({ text: "", style: "" }),
+			new St.Label({ text: "", style: "" }),
+			new St.Label({ text: "", style: "" }),
+			new St.Label({ text: "", style: "" })
+		];
+		for (let i = 0; i < 4; i++) {
+			this.outlineContainer.add_actor(this.outlineLabels[i]);
+		}
+
+		// time label
 		this.timeLabel = new St.Label({ text: "", style: "" });
 		this.container.add_actor(this.timeLabel);
 
@@ -101,6 +118,9 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.settings.bind("no_art_position", "noArtPosition", bind(this, this._positionLabel));
 		this.settings.bind("no_art_x_offset", "noArtXOffset", bind(this, this._positionLabel));
 		this.settings.bind("no_art_y_offset", "noArtYOffset", bind(this, this._positionLabel));
+		this.settings.bind("outline_enabled", "outlineEnabled", bind(this, this._toggleDesklet));
+		this.settings.bind("outline_size", "outlineSize", bind(this, this._updateTime));
+		this.settings.bind("outline_color","outlineColor", bind(this, this._updateFont));
 
 		// context menu
 		this.checkbox = new PopupMenu.PopupSwitchMenuItem("Disabled",this.disabled);
@@ -117,7 +137,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 		this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 		this._menu.addAction(_('Reload'), Lang.bind(this, this._toggleDesklet));
-		
+
 
 		// initial setup
 		this.art.hide();
@@ -125,7 +145,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this._updateLayout();
 		this._toggleDesklet();
 	},
-	
+
 	_toggleDesklet: function () {
 		this.checkbox.setToggleState(this.disabled);
 		this.overridesCheckbox.setToggleState(this.overridesEnabled);
@@ -205,13 +225,13 @@ MusicDisplayAdditionsDesklet.prototype = {
 			// Parse timestamped lines
 			const lines = text.split(/\r?\n/);
 			const entries = [];
-		
+
 			for (const line of lines) {
 				const match = line.match(/\[(.*?)\]:\s*(.*)/);
 				if (match) {
 					const [, timestamp, title] = match;
 					let secs = null;
-				
+
 					if (typeof timestamp === "number") secs = timestamp;
 					const parts = String(timestamp)
 						.trim()
@@ -272,7 +292,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 					this._setArt("");
 				} else {
 					// Playing / Paused
-					
+
 					// Update time
 					if (this.textEnabled) this._updateTime();
 					else this._setTimeText("");
@@ -284,7 +304,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 							const metadataChanged = (dump !== this._lastMetadataDump);
 							this._lastMetadataDump = dump;
 
-						
+
 							if (statusChanged || metadataChanged) {
 								if (this.debugMode) {
 									global.log(`[music-display-additions@nicholasjdi] art update triggered (statusChanged=${statusChanged}, metadataChanged=${metadataChanged})`);
@@ -426,16 +446,21 @@ MusicDisplayAdditionsDesklet.prototype = {
 		try {
 			if (!text || text === "") {
 				this.timeLabel.hide();
+				this.outlineContainer.hide();
 				if (this.disabled || !text) this.timeLabel.set_text(" ");
 				return true;
 			} else if (!this.timeLabel.visible) {
 				this.timeLabel.show();
 			}
+			this.outlineContainer.visible = (this.outlineEnabled & this.timeLabel.visible)
 			if (text != this._lastTimeText) {
 				if (this.debugMode) {
 					global.log(`[music-display-additions@nicholasjdi] setting time text to ${text}`);
 				}
 				this.timeLabel.set_text(text);
+				for (let i = 0; i < 4; i++) {
+					this.outlineLabels[i].set_text(text);
+				}
 				this._lastTimeText = text
 			}
 			this._positionLabel();
@@ -596,6 +621,14 @@ MusicDisplayAdditionsDesklet.prototype = {
 			'font-size: ' + size + 'pt; ' +
 			'color: ' + this.color + ';';
 
+		for (let i = 0; i < 4; i++) {
+			this.outlineLabels[i].style =
+				'font-family: ' + family + '; ' +
+				'font-weight: ' + weightStr + '; ' +
+				'font-style: ' + styleStr + '; ' +
+				'font-size: ' + size + 'pt; ' +
+				'color: ' + this.outlineColor + ';';
+		}
 		this._positionLabel();
 	},
 
@@ -655,6 +688,12 @@ MusicDisplayAdditionsDesklet.prototype = {
 					topY = anchorY - Math.round(labelH / 2) + yOffset;
 
 				this.timeLabel.set_position(Math.round(leftX), Math.round(topY));
+				if (this.outlineEnabled) {
+					this.outlineLabels[0].set_position(Math.round(leftX - this.outlineSize), Math.round(topY - this.outlineSize));
+					this.outlineLabels[1].set_position(Math.round(leftX + this.outlineSize), Math.round(topY + this.outlineSize));
+					this.outlineLabels[2].set_position(Math.round(leftX - this.outlineSize), Math.round(topY + this.outlineSize));
+					this.outlineLabels[3].set_position(Math.round(leftX + this.outlineSize), Math.round(topY - this.outlineSize));
+				}
 				return false;
 			})
 		);
