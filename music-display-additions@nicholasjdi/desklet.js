@@ -120,7 +120,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.settings.bind("no_art_y_offset", "noArtYOffset", bind(this, this._positionLabel));
 		this.settings.bind("outline_enabled", "outlineEnabled", bind(this, this._toggleDesklet));
 		this.settings.bind("outline_size", "outlineSize", bind(this, this._updateTime));
-		this.settings.bind("outline_color","outlineColor", bind(this, this._updateFont));
+		this.settings.bind("outline_color", "outlineColor", bind(this, this._updateFont));
 
 		// context menu
 		this.checkbox = new PopupMenu.PopupSwitchMenuItem("Disabled",this.disabled);
@@ -159,6 +159,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this._lastStatus = null;
 		this._lastMetadataDump = null;
 		this._lastMixTitle = null;
+		this._lastTimeText = null;
 		this._updateStatus();
 		this._resetPolling();
 	},
@@ -363,43 +364,43 @@ MusicDisplayAdditionsDesklet.prototype = {
 		try {
 			if (this.disabled || !this.textEnabled) {
 				this._setTimeText("");
-				return true;
-			}
-			this._runPlayerctlAsync(['position'], timeOut => {
-				this._runPlayerctlAsync(['metadata', 'mpris:length'], lengthOut => {
-					lengthOut = lengthOut / 1000000
-					const timeSeconds = Math.floor(timeOut);
-					const timeMinutes = Math.floor(timeOut / 60);
-					const timeHours = Math.floor(timeOut / 3600);
-					const lengthSeconds = Math.floor(lengthOut);
-					const lengthMinutes = Math.floor(lengthOut / 60);
-					const lengthHours = Math.floor(lengthOut / 3600);
-					// GOOD LORD THIS IS SO UNREADABLE
-					// %time%
-					let timeText = this.timeFormat.replace(`%time%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : "0:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : "0:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
-					timeText = timeText.replaceAll(`%time|0:00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : "0:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : "0:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
-					timeText = timeText.replaceAll(`%time|00:00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : "00:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : "00:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
-					timeText = timeText.replaceAll(`%time|00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : ""}${timeSeconds > 0 ? (timeMinutes > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : (timeSeconds % 60).toString()) : "0"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : (lengthSeconds % 60).toString()) : "0"}`);
-					timeText = timeText.replaceAll(`%time|0%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeMinutes % 60).toString() + ":" : ""}${timeSeconds > 0 ? (timeSeconds % 60).toString() : "0"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthMinutes % 60).toString() + ":" : ""}${lengthSeconds > 0 ? (lengthSeconds % 60).toString() : "0"}`);
-					timeText = timeText.replaceAll(`%time|0:0%`,`${lengthHours > 0 ? timeHours.toString().padStart(lengthHours.toString().length,"0") + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString().padStart((lengthMinutes % 60).toString().length,"0") + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : (timeSeconds % 60).toString().padStart((lengthSeconds % 60).toString().length,"0")) : "0"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : (lengthSeconds % 60).toString()) : "0"}`);
-					// %position%
-					timeText = timeText.replaceAll(`%position%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : "0:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}`);
-					timeText = timeText.replaceAll(`%position|0:00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : "0:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}`);
-					timeText = timeText.replaceAll(`%position|00:00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : "00:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}`);
-					timeText = timeText.replaceAll(`%position|00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : ""}${timeSeconds > 0 ? (timeMinutes > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : (timeSeconds % 60).toString()) : "0"}`);
-					timeText = timeText.replaceAll(`%position|0%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeMinutes % 60).toString() + ":" : ""}${timeSeconds > 0 ? (timeSeconds % 60).toString() : "0"}`);
-					timeText = timeText.replaceAll(`%position|0:0%`,`${lengthHours > 0 ? timeHours.toString().padStart(lengthHours.toString().length,"0") + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString().padStart((lengthMinutes % 60).toString().length,"0") + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : (timeSeconds % 60).toString().padStart((lengthSeconds % 60).toString().length,"0")) : "0"}`);
-					// %length%
-					timeText = timeText.replaceAll(`%length%`,`${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : "0:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
-					timeText = timeText.replaceAll(`%length|0:00%`,`${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : "0:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
-					timeText = timeText.replaceAll(`%length|00:00%`,`${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : "00:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
-					timeText = timeText.replaceAll(`%length|00%`,`${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : (lengthSeconds % 60).toString()) : "0"}`);
-					timeText = timeText.replaceAll(`%length|0%`,`${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthMinutes % 60).toString() + ":" : ""}${lengthSeconds > 0 ? (lengthSeconds % 60).toString() : "0"}`);
-					timeText = timeText.replaceAll(`%length|0:0%`,`${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : (lengthSeconds % 60).toString()) : "0"}`);
+			} else {
+				this._runPlayerctlAsync(['position'], timeOut => {
+					this._runPlayerctlAsync(['metadata', 'mpris:length'], lengthOut => {
+						lengthOut = lengthOut / 1000000
+						const timeSeconds = Math.floor(timeOut);
+						const timeMinutes = Math.floor(timeOut / 60);
+						const timeHours = Math.floor(timeOut / 3600);
+						const lengthSeconds = Math.floor(lengthOut);
+						const lengthMinutes = Math.floor(lengthOut / 60);
+						const lengthHours = Math.floor(lengthOut / 3600);
+						// GOOD LORD THIS IS SO UNREADABLE
+						// %time%
+						let timeText = this.timeFormat.replace(`%time%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : "0:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : "0:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
+						timeText = timeText.replaceAll(`%time|0:00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : "0:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : "0:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
+						timeText = timeText.replaceAll(`%time|00:00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : "00:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : "00:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
+						timeText = timeText.replaceAll(`%time|00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : ""}${timeSeconds > 0 ? (timeMinutes > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : (timeSeconds % 60).toString()) : "0"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : (lengthSeconds % 60).toString()) : "0"}`);
+						timeText = timeText.replaceAll(`%time|0%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeMinutes % 60).toString() + ":" : ""}${timeSeconds > 0 ? (timeSeconds % 60).toString() : "0"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthMinutes % 60).toString() + ":" : ""}${lengthSeconds > 0 ? (lengthSeconds % 60).toString() : "0"}`);
+						timeText = timeText.replaceAll(`%time|0:0%`,`${lengthHours > 0 ? timeHours.toString().padStart(lengthHours.toString().length,"0") + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString().padStart((lengthMinutes % 60).toString().length,"0") + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : (timeSeconds % 60).toString().padStart((lengthSeconds % 60).toString().length,"0")) : "0"}/${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : (lengthSeconds % 60).toString()) : "0"}`);
+						// %position%
+						timeText = timeText.replaceAll(`%position%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : "0:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}`);
+						timeText = timeText.replaceAll(`%position|0:00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : "0:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}`);
+						timeText = timeText.replaceAll(`%position|00:00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : "00:"}${timeSeconds > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : "00"}`);
+						timeText = timeText.replaceAll(`%position|00%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString() + ":") : ""}${timeSeconds > 0 ? (timeMinutes > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : (timeSeconds % 60).toString()) : "0"}`);
+						timeText = timeText.replaceAll(`%position|0%`,`${timeHours > 0 ? timeHours.toString() + ":" : ""}${timeMinutes > 0 ? (timeMinutes % 60).toString() + ":" : ""}${timeSeconds > 0 ? (timeSeconds % 60).toString() : "0"}`);
+						timeText = timeText.replaceAll(`%position|0:0%`,`${lengthHours > 0 ? timeHours.toString().padStart(lengthHours.toString().length,"0") + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (timeMinutes % 60).toString().padStart(2, "0") + ":" : (timeMinutes % 60).toString().padStart((lengthMinutes % 60).toString().length,"0") + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (timeSeconds % 60).toString().padStart(2,"0") : (timeSeconds % 60).toString().padStart((lengthSeconds % 60).toString().length,"0")) : "0"}`);
+						// %length%
+						timeText = timeText.replaceAll(`%length%`,`${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : "0:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
+						timeText = timeText.replaceAll(`%length|0:00%`,`${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : "0:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
+						timeText = timeText.replaceAll(`%length|00:00%`,`${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : "00:"}${lengthSeconds > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : "00"}`);
+						timeText = timeText.replaceAll(`%length|00%`,`${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : (lengthSeconds % 60).toString()) : "0"}`);
+						timeText = timeText.replaceAll(`%length|0%`,`${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthMinutes % 60).toString() + ":" : ""}${lengthSeconds > 0 ? (lengthSeconds % 60).toString() : "0"}`);
+						timeText = timeText.replaceAll(`%length|0:0%`,`${lengthHours > 0 ? lengthHours.toString() + ":" : ""}${lengthMinutes > 0 ? (lengthHours > 0 ? (lengthMinutes % 60).toString().padStart(2, "0") + ":" : (lengthMinutes % 60).toString() + ":") : ""}${lengthSeconds > 0 ? (lengthMinutes > 0 ? (lengthSeconds % 60).toString().padStart(2,"0") : (lengthSeconds % 60).toString()) : "0"}`);
 
-					this._setTimeText(timeText);
+						this._setTimeText(timeText);
+					});
 				});
-			});
+			}
 		} catch (e) {
 			global.logError(`[music-display-additions@nicholasjdi] _updateTime exception: ${e}`);
 		}
@@ -447,12 +448,11 @@ MusicDisplayAdditionsDesklet.prototype = {
 			if (!text || text === "") {
 				this.timeLabel.hide();
 				this.outlineContainer.hide();
-				if (this.disabled || !text) this.timeLabel.set_text(" ");
 				return true;
-			} else if (!this.timeLabel.visible) {
+			} else if (!this.timeLabel.visible & !this.disabled) {
 				this.timeLabel.show();
 			}
-			this.outlineContainer.visible = (this.outlineEnabled & this.timeLabel.visible)
+			this.outlineContainer.visible = (this.outlineEnabled & this.timeLabel.visible & !(this.timeLabel.get_text().trim() == ""));
 			if (text != this._lastTimeText) {
 				if (this.debugMode) {
 					global.log(`[music-display-additions@nicholasjdi] setting time text to ${text}`);
@@ -641,10 +641,6 @@ MusicDisplayAdditionsDesklet.prototype = {
 				if (timeout) {
 					GLib.source_remove(timeout);
 					timeout = null;
-				}
-				if (this.textEnabled) this.timeLabel.show();
-				else {
-					this.timeLabel.hide();
 				}
 
 				let position = this.position;
