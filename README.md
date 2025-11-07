@@ -37,7 +37,7 @@ The Metadata Key to grab from. (xesam:trackNumber)<br>
 Run: `playerctl metadata` to show Metadata for the current Track.
 #### Example
 Using all of these tags we can set line 1 to "%title%" and set line 2 to "%(by )[]xesam:artist(%( - )[]xesam:album(%( #%()[]xesam:discNumber(-)%)[]xesam:trackNumber()%)%)%" to show:<br>
-<img width="402" height="68" alt="image" src="https://github.com/user-attachments/assets/6e3b9717-c992-4889-b1ea-9eeaa85620cc" /><br>
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/586e0ab5-b535-4ed9-8cf0-a2febfbe8418" /><br>
 for Rhythmbox, Firefox and Spotify. (i'm using rhythmbox in these examples. Note: VLC has really bad Metadata support, that's why its not referenced here.)
 ### Tag Settings
 #### Mix Detection
