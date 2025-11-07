@@ -149,5 +149,6 @@ A Comma-separated list of allowed Players. (rhythmbox,spotify)
 #### Treat Whitelist As Blacklist
 Whether or not to treat the Whitelist as a Blacklist
 ### Example
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/90824579-95cf-451c-a7b7-64cd440beb09" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/0a3accd3-59ef-4e14-98a0-75a11741e1dc" />
+
 
