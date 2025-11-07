@@ -113,9 +113,15 @@ The X and Y Offset of the Text from the Anchor Position.
 The Anchor Position of the Text when no Art is found, (not Art Enabled = false) Values are: Top Left, Top Right, Bottom Left, Bottom Right, Center.
 #### No Art X/Y Offset
 The X and Y Offset of the Text from the Anchor Position when no Art is found. (not Art Enabled = false) 
+#### Outline Enabled
+Whether or not Text Outline is Enabled.
+#### Outline Size
+How large the Text Outline is in Pixels.
+#### Outline Color
+The Color of the Text Outline.
 ### Art Settings
 #### Enabled
-Whether or not Text is Enabled.
+Whether or not Art is Enabled.
 #### Margin Size
 The size of the Margin around Art.
 #### Margin Color
@@ -143,4 +149,5 @@ A Comma-separated list of allowed Players. (rhythmbox,spotify)
 #### Treat Whitelist As Blacklist
 Whether or not to treat the Whitelist as a Blacklist
 ### Example
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/abc51516-e519-4729-afb8-c66fe6f18fb7" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/90824579-95cf-451c-a7b7-64cd440beb09" />
+
