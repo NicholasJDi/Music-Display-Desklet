@@ -116,6 +116,44 @@
 	},
 	"head4": {
 		"type": "header",
+		"description": "Context Menu Settings"
+	},
+	"open_player_name": {
+		"type": "entry",
+		"description": "Open Player Item Name",
+		"default": "Open Rhythmbox",
+		"tooltip": "The Name of the Open Player Context Menu Item.",
+		"dependency": "open_player_visible"
+	},
+	"open_player_command": {
+		"type": "entry",
+		"description": "Open Player Command",
+		"default": "rhythmbox",
+		"tooltip": "The Command the Open Player Context Menu Item runs when clicked.",
+		"dependency": "open_player_visible"
+	},
+	"open_player_visible": {
+		"type": "checkbox",
+		"description": "Open Player Visible",
+		"default": true
+	},
+	"play/pause_visible": {
+		"type": "checkbox",
+		"description": "Play/Pause Visible",
+		"default": true
+	},
+	"next/previous_visible": {
+		"type": "checkbox",
+		"description": "Next/Previous Visible",
+		"default": true
+	},
+	"stop_player_visible": {
+		"type": "checkbox",
+		"description": "Stop Player Visible",
+		"default": true
+	},
+	"head5": {
+		"type": "header",
 		"description": "Tag Settings"
 	},
 	"mix_detection": {
@@ -130,7 +168,7 @@
 		"default": "Unknown,None,N/A,0",
 		"tooltip":"Comma-separated list of values to treat as NULL in custom format tags"
 	},
-	"head5": {
+	"head6": {
 		"type": "header",
 		"description": "Player Settings"
 	},
@@ -163,7 +201,7 @@
 		"description": "Treat whitelist as blacklist instead",
 		"default": false
 	},
-	"head6": {
+	"head7": {
 		"type": "header",
 		"description": ""
 	},

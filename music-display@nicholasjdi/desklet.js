@@ -14,7 +14,7 @@ function MusicDisplayDesklet(metadata, instance_id) {
 MusicDisplayDesklet.prototype = {
 	__proto__: Desklet.Desklet.prototype,
 
-	_init: function(metadata, instance_id) {
+	_init: function (metadata, instance_id) {
 		Desklet.Desklet.prototype._init.call(this, metadata, instance_id);
 		this.metadata = metadata;
 		const basePath = this.metadata.path + "/textures/";
@@ -51,6 +51,13 @@ MusicDisplayDesklet.prototype = {
 		this.btnPauseTexture = basePath + "pause.png";
 		this.btnNextTexture = basePath + "next.png";
 		this.btnPrevTexture = basePath + "previous.png";
+
+		this.openPlayerMenuItemName = "Open Rhythmbox"
+		this.openPlayerMenuItemCommand = "rhythmbox"
+		this.openPlayerMenuItemVisible = true
+		this.playPauseMenuItemVisible = true
+		this.nextPreviousMenuItemsVisible = true
+		this.stopPlayerMenuItemVisible = true
 
 		// Track last displayed info
 		this._lastStatus = null;
@@ -103,59 +110,88 @@ MusicDisplayDesklet.prototype = {
 		this.mainBox.add_child(this.textVBox);
 
 		this.labelTitle = new St.Label({
-		text: "Loading…",
-		x_expand: true
+			text: "Loading…",
+			x_expand: true
 		});
 		this.textVBox.add_child(this.labelTitle);
 
 		this.labelArtist = new St.Label({
-		text: "",
-		x_expand: true
+			text: "",
+			x_expand: true
 		});
 		this.textVBox.add_child(this.labelArtist);
 
-		// Context Menu Open Rhythmbox
-		this._menu.addAction(_('Open Rhythmbox'), Lang.bind(this, function () {
-		GLib.spawn_command_line_async(`rhythmbox`);
-		}));
-		this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-		// Context Menu Play/Pause Track
-		this._menu.addAction(_('Play/Pause Track'), Lang.bind(this, function () {
-		GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} play-pause`);
-		this._updateStatus();
-		}));
-		// Context Menu Next Track
-		this._menu.addAction(_('Next Track'), Lang.bind(this, function () {
-		GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} next`);
-		this._updateStatus();
-		}));
-		// Context Menu Previous Track
-		this._menu.addAction(_('Previous Track'), Lang.bind(this, function () {
-		GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} previous`);
-		this._updateStatus();
-		}));
-		// Context Menu Stop Player
-		this._menu.addAction(_('Stop Player'), Lang.bind(this, function () {
-		GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} stop`);
-		this._updateStatus();
-		}));
-		this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-		// Context Menu Reload Desklet
-		this._menu.addAction(_('Reload'), Lang.bind(this, function () {
-		this._updateAll();
-		this._resetPolling;
-		}));
+		this._buildContextMenu();
 
 		// Initial run
 		this._updateAll();
 		this._startPolling(this.pollInterval);
 	},
 
-	_checkPlayerctlInstalled: function() {
-	return !!GLib.find_program_in_path("playerctl");
+	_checkPlayerctlInstalled: function () {
+		return !!GLib.find_program_in_path("playerctl");
 	},
 
-	_bindSettings: function() {
+	_buildContextMenu: function () {
+		if (this.openPlayerMenuItem == null) {
+			// Build Context Menu
+			// Context Menu Open Player
+			this.openPlayerMenuItem = new PopupMenu.PopupMenuItem(this.openPlayerMenuItemName);
+			this._menu.addMenuItem(this.openPlayerMenuItem)
+			this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+			// Context Menu Play/Pause Track
+			this.playPauseMenuItem = this._menu.addAction(_('Play/Pause Track'), Lang.bind(this, function () {
+				GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} play-pause`);
+				this._updateStatus();
+			}));
+			// Context Menu Next Track
+			this.nextMenuItem = this._menu.addAction(_('Next Track'), Lang.bind(this, function () {
+				GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} next`);
+				this._updateStatus();
+			}));
+			// Context Menu Previous Track
+			this.previousMenuItem = this._menu.addAction(_('Previous Track'), Lang.bind(this, function () {
+				GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} previous`);
+				this._updateStatus();
+			}));
+			// Context Menu Stop Player
+			this.stopPlayerMenuItem = this._menu.addAction(_('Stop Player'), Lang.bind(this, function () {
+				GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} stop`);
+				this._updateStatus();
+			}));
+			this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+			// Context Menu Reload Desklet
+			this.reloadMenuItem = this._menu.addAction(_('Reload'), Lang.bind(this, function () {
+				this._updateAll();
+				this._resetPolling;
+			}));
+		}
+		// update open player menu item content
+		if (this.openPlayerMenuItem) {
+			// update label
+			this.openPlayerMenuItem.label.set_text(this.openPlayerMenuItemName);
+
+			// create command handler
+			if (this.openPlayerMenuItemSignal) {
+				this.openPlayerMenuItem.disconnect(this.openPlayerMenuItemSignal);
+			}
+
+			this.openPlayerMenuItemSignal = this.openPlayerMenuItem.connect(
+				'activate',
+				Lang.bind(this, function () {
+					GLib.spawn_command_line_async(this.openPlayerMenuItemCommand);
+				})
+			);
+		}
+		// update visibility
+		this.openPlayerMenuItem.actor.visible = this.openPlayerMenuItemVisible;
+		this.playPauseMenuItem.actor.visible = this.playPauseMenuItemVisible;
+		this.nextMenuItem.actor.visible = this.nextPreviousMenuItemsVisible;
+		this.previousMenuItem.actor.visible = this.nextPreviousMenuItemsVisible;
+		this.stopPlayerMenuItem.actor.visible = this.stopPlayerMenuItemVisible;
+	},
+
+	_bindSettings: function () {
 		const settings = this.settings;
 		const bind = Lang.bind;
 
@@ -183,6 +219,14 @@ MusicDisplayDesklet.prototype = {
 		settings.bind("button_text_spacing", "buttonTextSpacing", bind(this, this._updateAll));
 		settings.bind("button_size", "buttonSize", bind(this, this._updateAll));
 
+		// Context Menu Settings
+		settings.bind("open_player_name", "openPlayerMenuItemName", bind(this, this._buildContextMenu));
+		settings.bind("open_player_command", "openPlayerMenuItemCommand", bind(this, this._buildContextMenu));
+		settings.bind("open_player_visible", "openPlayerMenuItemVisible", bind(this, this._buildContextMenu));
+		settings.bind("play/pause_visible", "playPauseMenuItemVisible", bind(this, this._buildContextMenu));
+		settings.bind("next/previous_visible", "nextPreviousMenuItemsVisible", bind(this, this._buildContextMenu));
+		settings.bind("stop_player_visible", "stopPlayerMenuItemVisible", bind(this, this._buildContextMenu));
+
 		// Tag settings
 		settings.bind("mix_detection", "mixDetection", bind(this, this._updateAll));
 		settings.bind("empty_values", "emptyValues", bind(this, this._updateAll));
@@ -196,7 +240,7 @@ MusicDisplayDesklet.prototype = {
 		settings.bind("debug_mode", "debugMode", null);
 	},
 
-	_startPolling: function(interval) {
+	_startPolling: function (interval) {
 		// cancel existing timer if any
 		if (this._pollTimer) {
 			GLib.source_remove(this._pollTimer);
@@ -212,11 +256,11 @@ MusicDisplayDesklet.prototype = {
 		}
 	},
 
-	_resetPolling: function() {
+	_resetPolling: function () {
 		this._startPolling(this.pollInterval);
 	},
 
-	_updateAll: function() {
+	_updateAll: function () {
 		this.labelTitle.set_text("Loading...");
 		this.labelArtist.set_text("");
 		this._lastStatus = "Reload";
@@ -225,7 +269,7 @@ MusicDisplayDesklet.prototype = {
 		this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
 	},
 
-	_updateFont: function() {
+	_updateFont: function () {
 		// parse the font string from the settings
 		let desc1 = Pango.font_description_from_string(this.line1Font);
 		let desc2 = Pango.font_description_from_string(this.line2Font);
@@ -245,10 +289,10 @@ MusicDisplayDesklet.prototype = {
 		// turn weight/style into CSS-friendly strings
 		let weightStr1 = (weight1 >= Pango.Weight.BOLD) ? 'bold' : 'normal';
 		let styleStr1 = (style1 === Pango.Style.ITALIC) ? 'italic'
-						: (style1 === Pango.Style.OBLIQUE) ? 'oblique' : 'normal';
+			: (style1 === Pango.Style.OBLIQUE) ? 'oblique' : 'normal';
 		let weightStr2 = (weight2 >= Pango.Weight.BOLD) ? 'bold' : 'normal';
 		let styleStr2 = (style2 === Pango.Style.ITALIC) ? 'italic'
-						: (style2 === Pango.Style.OBLIQUE) ? 'oblique' : 'normal';
+			: (style2 === Pango.Style.OBLIQUE) ? 'oblique' : 'normal';
 
 		// now build a style string for St.Label
 		this.labelTitle.style =
@@ -265,11 +309,11 @@ MusicDisplayDesklet.prototype = {
 			'color: ' + this.line2Color + ';';
 
 		if (this.debugMode) {
-		global.log(`[music-display@nicholasjdi] Update font`);
+			global.log(`[music-display@nicholasjdi] Update font`);
 		}
 	},
 
-	_getPlayerctlArgsArray: function() {
+	_getPlayerctlArgsArray: function () {
 		if (!this.playerWhitelist || !this.playerWhitelist.toString().trim()) return [];
 		const players = this.playerWhitelist.split(",").map(p => p.trim()).filter(p => p.length > 0).join(",");
 		if (!players) return [];
@@ -277,7 +321,7 @@ MusicDisplayDesklet.prototype = {
 		return [flag];
 	},
 
-	_runPlayerctlAsync: function(argsArray, callback) {
+	_runPlayerctlAsync: function (argsArray, callback) {
 		try {
 			const argv = ['playerctl'];
 			const extra = this._getPlayerctlArgsArray();
@@ -303,7 +347,7 @@ MusicDisplayDesklet.prototype = {
 		}
 	},
 
-	_fetchCustomTagsAsync: function(formatStr, callback) {
+	_fetchCustomTagsAsync: function (formatStr, callback) {
 		// Quick check: if it doesn't contain all required chars, return the string as-is
 		if (!formatStr.includes('%') || !formatStr.includes('(') || !formatStr.includes(')') || !formatStr.includes('[') || !formatStr.includes(']')) {
 			callback(formatStr);
@@ -425,7 +469,7 @@ MusicDisplayDesklet.prototype = {
 		processNext();
 	},
 
-	_updateText: function(playerName, titleOverride = null) {
+	_updateText: function (playerName, titleOverride = null) {
 		try {
 			const fields = ['xesam:title', 'xesam:artist', 'xesam:album'];
 			const results = {};
@@ -435,7 +479,7 @@ MusicDisplayDesklet.prototype = {
 				this._runPlayerctlAsync(['metadata', field], val => {
 					results[field] = val ||
 						(field === 'xesam:title' ? "Unknown Title" :
-						field === 'xesam:artist' ? "Unknown Artist" : "Unknown Album");
+							field === 'xesam:artist' ? "Unknown Artist" : "Unknown Album");
 					pending--;
 					if (pending === 0) {
 						const title = titleOverride || results['xesam:title'];
@@ -478,7 +522,7 @@ MusicDisplayDesklet.prototype = {
 		}
 	},
 
-	_applyMixTags: function(formatStr, normalTitle) {
+	_applyMixTags: function (formatStr, normalTitle) {
 		// Only proceed if the mini-syntax might be present
 		if (!formatStr || formatStr.indexOf('%(') === -1 || formatStr.indexOf(')mix(') === -1) {
 			return formatStr;
@@ -526,7 +570,7 @@ MusicDisplayDesklet.prototype = {
 					for (let i = parts.length - 1; i >= 0; i--) {
 						seconds += parts[i] * multiplier;
 						multiplier *= 60;
-						}
+					}
 					secs = seconds;
 					if (!isNaN(secs)) {
 						entries.push({ time: secs, title: title.trim() });
@@ -550,7 +594,7 @@ MusicDisplayDesklet.prototype = {
 		}
 	},
 
-	_updateStatus: function() {
+	_updateStatus: function () {
 		try {
 			if (!this._checkPlayerctlInstalled()) {
 				this.labelTitle.set_text("playerctl is not installed");
@@ -638,10 +682,10 @@ MusicDisplayDesklet.prototype = {
 								this._lastMixTitle = null;
 								// yes this is a stupid way to do this but i can't think of a better way
 								if (this.mixDetection) {
-									this._runPlayerctlAsync(['metadata','xesam:comment',`--player=${firstPlayer}`], comment => {
+									this._runPlayerctlAsync(['metadata', 'xesam:comment', `--player=${firstPlayer}`], comment => {
 										if (comment.includes('[') && comment.includes(']: ')) {
 											this._runPlayerctlAsync(['position'], time => {
-												const mixTitle = this._grabMixTitleOverride(comment,time);
+												const mixTitle = this._grabMixTitleOverride(comment, time);
 												this._lastMixTitle = mixTitle;
 												this._updateText(firstPlayer, mixTitle);
 											});
@@ -651,10 +695,10 @@ MusicDisplayDesklet.prototype = {
 								const isPlaying = (status === "Playing");
 								this._updateButtonTextures(isPlaying);
 							} else if (this.mixDetection) {
-								this._runPlayerctlAsync(['metadata','xesam:comment',`--player=${firstPlayer}`], comment => {
+								this._runPlayerctlAsync(['metadata', 'xesam:comment', `--player=${firstPlayer}`], comment => {
 									if (comment.includes('[') && comment.includes(']: ')) {
 										this._runPlayerctlAsync(['position'], time => {
-											const mixTitle = this._grabMixTitleOverride(comment,time);
+											const mixTitle = this._grabMixTitleOverride(comment, time);
 											if (mixTitle != this._lastMixTitle) {
 												if (this.debugMode) {
 													global.log(`[music-display@nicholasjdi] text update triggered because the track is a mix`);
@@ -699,9 +743,9 @@ MusicDisplayDesklet.prototype = {
 		}
 	},
 
-	_updateButtonTextures: function(isPlaying) {
+	_updateButtonTextures: function (isPlaying) {
 		if (this.debugMode) {
-		global.log(`[music-display@nicholasjdi] Update buttons`);
+			global.log(`[music-display@nicholasjdi] Update buttons`);
 		}
 		const basePath = this.metadata.path + "/textures/";
 		const playTexture = this.btnPlayTexture || basePath + "play.png";
@@ -730,28 +774,28 @@ MusicDisplayDesklet.prototype = {
 		}
 	},
 
-	_onPlayPausePressed: function(actor, event) {
+	_onPlayPausePressed: function (actor, event) {
 		if (event.get_button() === 1) {
 			GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} play-pause`);
 			this._updateStatus();
 		}
 	},
 
-	_onPrevPressed: function(actor, event) {
+	_onPrevPressed: function (actor, event) {
 		if (event.get_button() === 1) {
 			GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} previous`);
 			this._updateStatus();
 		}
 	},
 
-	_onNextPressed: function(actor, event) {
+	_onNextPressed: function (actor, event) {
 		if (event.get_button() === 1) {
 			GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} next`);
 			this._updateStatus();
 		}
 	},
 
-	on_desklet_removed: function() {
+	on_desklet_removed: function () {
 		if (this._pollId) {
 			GLib.source_remove(this._pollId);
 			this._pollId = null;
