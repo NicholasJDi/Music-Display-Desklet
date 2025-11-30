@@ -73,7 +73,7 @@ The size of the Buttons, when setting this with hidden skip buttons it looks lik
 #### Play/Pause/Next/Previous Button Texture
 Custom Texture to use for the Buttons. (forcefully rendered as a square)
 ## That Should Be All The Important Stuff, I Hope You Enjoy Using This!
-Also the inspiration for this is from https://www.reddit.com/r/Minecraft/comments/10br3xj/my_desktop_theme_for_2023 (you can also use hidamari and duel-datetime to get an almost perfect match to this :D)
+Also the inspiration for this is from https://www.reddit.com/r/Minecraft/comments/10br3xj/my_desktop_theme_for_2023 (you can also use Hidamari and dual-datetime@rcalixte to get an almost perfect match to this :D)
 
 If your wondering, this is my desktop: (fonts are Minecraftia and Lobster)<br>
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/1f0f655f-e5b4-48fa-905f-28b97e55aab1" />
