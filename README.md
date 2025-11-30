@@ -37,7 +37,7 @@ The Metadata Key to grab from. (xesam:trackNumber)<br>
 Run: `playerctl metadata` to show Metadata for the current Track.
 #### Example
 Using all of these tags we can set line 1 to "%title%" and set line 2 to "%(by )[]xesam:artist(%( - )[]xesam:album(%( #%()[]xesam:discNumber(-)%)[]xesam:trackNumber()%)%)%" to show:<br>
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/586e0ab5-b535-4ed9-8cf0-a2febfbe8418" /><br>
+<img width="1366" height="768" alt="Screenshot from 2025-11-30 14-43-59" src="https://github.com/user-attachments/assets/875064dc-e524-465f-878a-70b70ff7601e" />
 for Rhythmbox, Firefox and Spotify. (i'm using rhythmbox in these examples. Note: VLC has really bad Metadata support, that's why its not referenced here.)
 ### Tag Settings
 #### Mix Detection
@@ -76,7 +76,7 @@ Custom Texture to use for the Buttons. (forcefully rendered as a square)
 Also the inspiration for this is from https://www.reddit.com/r/Minecraft/comments/10br3xj/my_desktop_theme_for_2023 (you can also use Hidamari and dual-datetime@rcalixte to get an almost perfect match to this :D)
 
 If your wondering, this is my desktop: (fonts are Minecraftia and Lobster)<br>
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/1f0f655f-e5b4-48fa-905f-28b97e55aab1" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/586e0ab5-b535-4ed9-8cf0-a2febfbe8418" /><br>
 <br><br><br>
 # Music-Display Additions
 Music-Display Additions is a Sister Desklet of Music-Display Desklet that shows current Time and Art of a Track using similar systems.
