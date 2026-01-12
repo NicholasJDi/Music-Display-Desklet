@@ -63,9 +63,10 @@ MusicDisplayDesklet.prototype = {
 		this._lastStatus = null;
 		this._lastPlayPauseFile = null;
 		this._lastMetadataDump = null;
-		this._currentPlayer = null;
 		this._lastText = null;
 		this._lastMixTitle = null;
+		this._currentPlayer = null;
+		this._currentPlayerctlArgs = null;
 
 
 		// Polling
@@ -106,26 +107,31 @@ MusicDisplayDesklet.prototype = {
 		this.mainBox.add_child(this.spacingWidget);
 
 		// Text column
-		this.textVBox = new St.BoxLayout({ vertical: true, y_expand: true });
+		this.textVBox = new St.BoxLayout({ vertical: true});
 		this.mainBox.add_child(this.textVBox);
 
-		this.labelTitle = new St.Label({
-			text: "Loading…",
-			x_expand: true
-		});
+		this.labelTitle = new St.Label({ text: "Loading…" });
 		this.textVBox.add_child(this.labelTitle);
 
-		this.labelArtist = new St.Label({
-			text: "",
-			x_expand: true
-		});
+		this.labelArtist = new St.Label({ text: "" });
 		this.textVBox.add_child(this.labelArtist);
 
 		this._buildContextMenu();
 
 		// Initial run
 		this._updateAll();
-		this._startPolling(this.pollInterval);
+		let timeout = GLib.timeout_add(
+			GLib.PRIORITY_DEFAULT_IDLE,
+			0,
+			Lang.bind(this, function () {
+				if (timeout) {
+					GLib.source_remove(timeout);
+					timeout = null;
+				}
+				this._updateStatus();
+				this._startPolling(this.pollInterval);
+			})
+		);
 	},
 
 	_checkPlayerctlInstalled: function () {
@@ -250,7 +256,7 @@ MusicDisplayDesklet.prototype = {
 		// store and start new timer
 		this._currentInterval = interval;
 		const ms = Math.round(interval * 1000)
-		this._pollTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, Lang.bind(this, this._updateStatus));
+		this._pollTimer = GLib.timeout_add(GLib.PRIORITY_IDLE, ms, Lang.bind(this, this._updateStatus));
 		if (this.debugMode) {
 			global.log(`[music-display@nicholasjdi] resetting poll interval to ${this._currentInterval}s`);
 		}
@@ -266,7 +272,7 @@ MusicDisplayDesklet.prototype = {
 		this._lastStatus = "Reload";
 		this._lastText = null;
 		this._updateFont();
-		this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
+		this.spacingWidget.width = this.buttonTextSpacing;
 	},
 
 	_updateFont: function () {
@@ -314,19 +320,17 @@ MusicDisplayDesklet.prototype = {
 	},
 
 	_getPlayerctlArgsArray: function () {
-		if (!this.playerWhitelist || !this.playerWhitelist.toString().trim()) return [];
+		if (!this.playerWhitelist.toString().trim()) return [];
 		const players = this.playerWhitelist.split(",").map(p => p.trim()).filter(p => p.length > 0).join(",");
 		if (!players) return [];
 		const flag = this.treatWhitelistAsBlacklist ? `--ignore-player=${players}` : `--player=${players}`;
 		return [flag];
 	},
 
+	// this function is so unintelligible 
 	_runPlayerctlAsync: function (argsArray, callback) {
 		try {
-			const argv = ['playerctl'];
-			const extra = this._getPlayerctlArgsArray();
-			for (let e of extra) argv.push(e);
-			for (let a of argsArray) argv.push(a);
+			const argv = ['playerctl', ...this._currentPlayerctlArgs, ...argsArray];
 
 			let proc = new Gio.Subprocess({
 				argv: argv,
@@ -339,10 +343,12 @@ MusicDisplayDesklet.prototype = {
 					let [ok, stdout, stderr] = procObj.communicate_utf8_finish(res);
 					callback(ok && stdout ? stdout.toString().trim() : "");
 				} catch (e) {
+					global.logError(`[music-display@nicholasjdi] _runPlayerctlAsync exception: ${e}`);
 					callback("");
 				}
 			});
 		} catch (e) {
+			global.logError(`[music-display@nicholasjdi] _runPlayerctlAsync exception: ${e}`);
 			callback("");
 		}
 	},
@@ -509,6 +515,7 @@ MusicDisplayDesklet.prototype = {
 										global.log(`[music-display@nicholasjdi] Updating text: ${title}, ${artist}, ${album}, ${playerName}.`);
 									}
 									this._lastText = currentText;
+									
 									this.labelTitle.set_text(final1);
 									this.labelArtist.set_text(final2);
 								}
@@ -603,6 +610,7 @@ MusicDisplayDesklet.prototype = {
 				this.spacingWidget.hide();
 				return true;
 			}
+			this._currentPlayerctlArgs = this._getPlayerctlArgsArray();
 
 			this._runPlayerctlAsync(['status'], statusOut => {
 				const status = statusOut ? statusOut.trim() : "";

@@ -1,13 +1,13 @@
 {
 	"head1": {
 		"type": "header",
-		"description": "Line 1 Settings"
+		"description": "Line 1"
 	},
 	"line1_format": {
 		"type": "entry",
 		"description": "Format",
 		"default": "%title%",
-		"tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display"
+		"tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display."
 	},
 	"line1_font": {
 		"type": "fontchooser",
@@ -19,27 +19,27 @@
 		"description": "Color",
 		"default": "white"
 	},
-	"line1_no_player": {
-		"type": "entry",
-		"description": "Line 1 text when no player is running",
-		"default": "No player running"
-	},
 	"line1_stopped": {
 		"type": "entry",
-		"description": "Line 1 text when player is stopped",
+		"description": "Player stopped text",
 		"default": "Player %player% is stopped",
 		"tooltip": "Use %player% to get running player id"
+	},
+	"line1_no_player": {
+		"type": "entry",
+		"description": "No Player Text",
+		"default": "No player running"
 	},
 
 	"head2": {
 		"type": "header",
-		"description": "Line 2 Settings"
+		"description": "Line 2"
 	},
 	"line2_format": {
 		"type": "entry",
 		"description": "Format",
 		"default": "%artist%",
-		"tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display"
+		"tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display."
 	},
 	"line2_font": {
 		"type": "fontchooser",
@@ -51,28 +51,28 @@
 		"description": "Color",
 		"default": "white"
 	},
-	"line2_no_player": {
-		"type": "entry",
-		"description": "Line 2 text when no player is running",
-		"default": ""
-	},
 	"line2_stopped": {
 		"type": "entry",
-		"description": "Line 2 text when player is stopped",
+		"description": "Player stopped text",
 		"default": "",
 		"tooltip": "Use %player% to get running player id"
+	},
+	"line2_no_player": {
+		"type": "entry",
+		"description": "No Player Text",
+		"default": ""
 	},
 
 	"head3": {
 		"type": "header",
-		"description": "Button Settings"
+		"description": "Buttons"
 	},
 	"button_text_spacing": {
-		"type": "scale",
+		"type": "spinbutton",
 		"description": "Spacing (pixels) between buttons and text",
 		"default": 7,
 		"min": 0,
-		"max": 50,
+		"max": 100,
 		"step": 1
 	},
 	"hide_all_buttons": {
@@ -87,11 +87,11 @@
 		"default": false
 	},
 	"button_size": {
-	"type": "scale",
+	"type": "spinbutton",
 	"description": "Button size (pixels)",
 	"default": 34,
 	"min": 8,
-	"max": 128,
+	"max":500,
 	"step": 1
 	},
 	"btn_play_texture": {
@@ -114,9 +114,10 @@
 		"description": "Previous button texture",
 		"default": ""
 	},
+
 	"head4": {
 		"type": "header",
-		"description": "Context Menu Settings"
+		"description": "Context Menu"
 	},
 	"open_player_name": {
 		"type": "entry",
@@ -152,15 +153,16 @@
 		"description": "Stop Player Visible",
 		"default": true
 	},
+
 	"head5": {
 		"type": "header",
-		"description": "Tag Settings"
+		"description": "Tags"
 	},
 	"mix_detection": {
 		"type": "checkbox",
 		"description": "Mix Detection",
 		"default": false,
-		"tooltip": "Check 'xesam:comment' for lines formatted as \"[(hours):(minutes):(seconds)]: (Title)\"\n\nIf these lines exist it will replace the %title% with the provided title.\nAdditionally when enabled, the %()mix()% tag can be used to grab the xesam:title, if no timestamp lines are provided it will return an empty string.\n\nWARNING: This can decrease performance a LOT."
+		"tooltip": "Check 'xesam:comment' for lines formatted as \"[(hours):(minutes):(seconds)]: (Title)\"\n\nIf these lines exist it will replace the %title% with the provided title.\nAdditionally when enabled, the %()mix()% tag can be used to grab the xesam:title, if no timestamp lines are provided it will return an empty string.\n\nWARNING: This can decrease performance a lot."
 	},
 	"empty_values": {
 		"type": "entry",
@@ -168,9 +170,10 @@
 		"default": "Unknown,None,N/A,0",
 		"tooltip":"Comma-separated list of values to treat as NULL in custom format tags"
 	},
+
 	"head6": {
 		"type": "header",
-		"description": "Player Settings"
+		"description": "Player Detection"
 	},
 	"poll_interval": {
 	"type": "scale",
@@ -184,7 +187,7 @@
 	"idle_poll_interval": {
 	"type": "scale",
 	"description": "Player polling interval (seconds)",
-	"tooltip": "How often the desklet checks for players. (no player/stopped)",
+	"tooltip": "How often the desklet checks for players. (no player/player stopped)",
 	"default": 3,
 	"min": 1,
 	"max": 10,
@@ -194,13 +197,14 @@
 		"type": "entry",
 		"description": "Player whitelist",
 		"default": "rhythmbox,spotify",
-		"tooltip":"Comma-separated list of allowed players"
+		"tooltip":"Comma-separated list of allowed players, the leftmost player will take priority."
 	},
 	"treat_whitelist_as_blacklist": {
 		"type": "checkbox",
 		"description": "Treat whitelist as blacklist instead",
 		"default": false
 	},
+
 	"head7": {
 		"type": "header",
 		"description": ""
