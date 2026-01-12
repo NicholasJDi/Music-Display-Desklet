@@ -59,6 +59,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this._pollTimer = null;
 		this._failArt = false;
 		this._lastMixTitle = null;
+		this._currentPlayerctlArgs = null;
 
 		// build container
 		this.container = new St.Widget({ reactive: true });
@@ -184,20 +185,18 @@ MusicDisplayAdditionsDesklet.prototype = {
 		if (!this.disabled) this._startPolling(this.pollInterval);
 	},
 
-	_getPlayerctlArgsArray: function() {
-		if (!this.playerWhitelist || !this.playerWhitelist.toString().trim()) return [];
+	_getPlayerctlArgsArray: function () {
+		if (!this.playerWhitelist.toString().trim()) return [];
 		const players = this.playerWhitelist.split(",").map(p => p.trim()).filter(p => p.length > 0).join(",");
 		if (!players) return [];
 		const flag = this.treatWhitelistAsBlacklist ? `--ignore-player=${players}` : `--player=${players}`;
 		return [flag];
 	},
 
+	// this function is so unintelligible 
 	_runPlayerctlAsync: function (argsArray, callback) {
 		try {
-			const argv = ['playerctl'];
-			const extra = this._getPlayerctlArgsArray();
-			for (let e of extra) argv.push(e);
-			for (let a of argsArray) argv.push(a);
+			const argv = ['playerctl', ...this._currentPlayerctlArgs, ...argsArray];
 
 			let proc = new Gio.Subprocess({
 				argv: argv,
@@ -210,10 +209,12 @@ MusicDisplayAdditionsDesklet.prototype = {
 					let [ok, stdout, stderr] = procObj.communicate_utf8_finish(res);
 					callback(ok && stdout ? stdout.toString().trim() : "");
 				} catch (e) {
+					global.logError(`[music-display@nicholasjdi] _runPlayerctlAsync exception: ${e}`);
 					callback("");
 				}
 			});
 		} catch (e) {
+			global.logError(`[music-display@nicholasjdi] _runPlayerctlAsync exception: ${e}`);
 			callback("");
 		}
 	},
@@ -272,6 +273,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	_updateStatus: function () {
 		try {
+			this._currentPlayerctlArgs = this._getPlayerctlArgsArray();
 			this._runPlayerctlAsync(['status'], statusOut => {
 				const status = statusOut ? statusOut.trim() : "";
 
@@ -685,10 +687,10 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 				this.timeLabel.set_position(Math.round(leftX), Math.round(topY));
 				if (this.outlineEnabled) {
-					this.outlineLabels[0].set_position(Math.round(leftX - this.outlineSize), Math.round(topY - this.outlineSize));
-					this.outlineLabels[1].set_position(Math.round(leftX + this.outlineSize), Math.round(topY + this.outlineSize));
-					this.outlineLabels[2].set_position(Math.round(leftX - this.outlineSize), Math.round(topY + this.outlineSize));
-					this.outlineLabels[3].set_position(Math.round(leftX + this.outlineSize), Math.round(topY - this.outlineSize));
+					this.outlineLabels[0].set_position(Math.round(leftX + this.outlineSize), Math.round(topY));
+					this.outlineLabels[1].set_position(Math.round(leftX - this.outlineSize), Math.round(topY));
+					this.outlineLabels[2].set_position(Math.round(leftX), Math.round(topY - this.outlineSize));
+					this.outlineLabels[3].set_position(Math.round(leftX), Math.round(topY + this.outlineSize));
 				}
 				return false;
 			})
