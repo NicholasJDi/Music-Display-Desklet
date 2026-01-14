@@ -116,7 +116,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.settings.bind("font", "font", bind(this, this._updateFont));
 		this.settings.bind("color", "color", bind(this, this._updateFont));
 		this.settings.bind("text_enabled", "textEnabled", bind(this, this._updateTime));
-		this.settings.bind("art_enabled", "artEnabled", bind(this, this._updateStatus));
+		this.settings.bind("art_enabled", "artEnabled", bind(this, this._toggleDesklet));
 		this.settings.bind("art_position", "artPosition", bind(this, this._updateLayout));
 		this.settings.bind("text_in_art", "textInArt", bind(this, this._positionLabel));
 		this.settings.bind("poll_interval", "pollInterval", bind(this, this._resetPolling));
@@ -716,9 +716,9 @@ MusicDisplayAdditionsDesklet.prototype = {
 				const labelH = this.timeLabel.get_height();
 				let dsW = this.xSize;
 				let dsH = this.ySize;
-				if (this.textInArt) {
-					dsW = this._artSize.width + (this.marginSize * 2);
-					dsH = this._artSize.height + (this.marginSize * 2);
+				if (this.textInArt && this.art.visible) {
+					dsW = this.margin.width;
+					dsH = this.margin.height;
 					xOffset += this.margin.position.x
 					yOffset += this.margin.position.y
 				}
