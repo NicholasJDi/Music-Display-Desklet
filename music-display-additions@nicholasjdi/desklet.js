@@ -7,6 +7,9 @@ const GLib = imports.gi.GLib;
 const Settings = imports.ui.settings;
 const Pango = imports.gi.Pango;
 const Soup = imports.gi.Soup;
+const GdkPixbuf = imports.gi.GdkPixbuf;
+const Clutter = imports.gi.Clutter;
+const Cogl = imports.gi.Cogl;
 
 function MusicDisplayAdditionsDesklet(metadata, instance_id) {
 	this._init(metadata, instance_id);
@@ -25,7 +28,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.position = "bottom_left";
 		this.xOffset = 10;
 		this.yOffset = -10;
-		this.margin = 5;
+		this.marginSize = 5;
 		this.marginColor = "white";
 		this.backgroundColor = "black";
 		this.timeFormat = "%time%";
@@ -33,6 +36,8 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.color = "white";
 		this.textEnabled = true;
 		this.artEnabled = true;
+		this.artPosition = "top_right";
+		this.textInArt = true;
 		this.pollInterval = 0.5;
 		this.idlePollInterval = 3;
 		this.playerWhitelist = "rhythmbox,spotify";
@@ -51,6 +56,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 		this._hideArt = true;
 		this._artSize = null;
+		this._imageSize = {width: 10, height: 10};
 		this._currentInterval = null;
 		this._lastMetadataDump = null;
 		this._lastStatus = null;
@@ -65,12 +71,16 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.container = new St.Widget({ reactive: true });
 		this.setContent(this.container);
 
+		// art outline margin
+		this.margin = new St.Widget({ reactive: true });
+		this.container.add_actor(this.margin);
+
 		// backdrop behind art
 		this.backdrop = new St.Widget({ reactive: true});
 		this.container.add_actor(this.backdrop);
 
 		// cover art
-		this.art = new St.Icon({ icon_size: this.xSize });
+		this.art = new St.Widget({ reactive: true });
 		this.container.add_actor(this.art);
 
 		// outline labels
@@ -99,7 +109,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.settings.bind("position", "position", bind(this, this._positionLabel));
 		this.settings.bind("x_offset", "xOffset", bind(this, this._positionLabel));
 		this.settings.bind("y_offset", "yOffset", bind(this, this._positionLabel));
-		this.settings.bind("margin", "margin", bind(this, this._updateLayout));
+		this.settings.bind("margin", "marginSize", bind(this, this._updateLayout));
 		this.settings.bind("margin_color", "marginColor", bind(this, this._updateLayout));
 		this.settings.bind("background_color", "backgroundColor", bind(this, this._updateLayout));
 		this.settings.bind("format", "timeFormat", bind(this, this._updateTime));
@@ -107,6 +117,8 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.settings.bind("color", "color", bind(this, this._updateFont));
 		this.settings.bind("text_enabled", "textEnabled", bind(this, this._updateTime));
 		this.settings.bind("art_enabled", "artEnabled", bind(this, this._updateStatus));
+		this.settings.bind("art_position", "artPosition", bind(this, this._updateLayout));
+		this.settings.bind("text_in_art", "textInArt", bind(this, this._positionLabel));
 		this.settings.bind("poll_interval", "pollInterval", bind(this, this._resetPolling));
 		this.settings.bind("idle_poll_interval", "idlePollInterval", bind(this, this._resetPolling));
 		this.settings.bind("player_whitelist", "playerWhitelist", bind(this, this._updateStatus));
@@ -193,7 +205,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		return [flag];
 	},
 
-	// this function is so unintelligible 
+	// this function is so unintelligible
 	_runPlayerctlAsync: function (argsArray, callback) {
 		try {
 			const argv = ['playerctl', ...this._currentPlayerctlArgs, ...argsArray];
@@ -476,7 +488,6 @@ MusicDisplayAdditionsDesklet.prototype = {
 				this._updateLayout();
 				return true;
 			}
-			this._artSize = Math.min(this.xSize - 2 * this.margin, this.ySize - 2 * this.margin);
 			if (artUrl.startsWith("https://")) {
 				if (this.debugMode) {
 					global.log(`[music-display-additions@nicholasjdi] parsing art from url: ${artUrl}`);
@@ -496,7 +507,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 			if (!artPath) {
 				this._hideArt = true;
 				this._updateLayout();
-				this.art.set_icon("");
+				this.art.set_content(null);
 				return true;
 			}
 
@@ -508,14 +519,26 @@ MusicDisplayAdditionsDesklet.prototype = {
 				return true;
 			}
 
-			// Set icon size first
-			this.art.icon_size = this._artSize || 200;
+			// Normalize Image To RGBA
+			let pixbuf = GdkPixbuf.Pixbuf.new_from_file(localPath);
+			if (!pixbuf.get_has_alpha()) {
+				pixbuf = pixbuf.add_alpha(false, 0, 0, 0);
+			}
 
-			// Load file
-			let file = Gio.File.new_for_path(localPath);
-			let fileIcon = new Gio.FileIcon({ file: file });
-			this.art.set_gicon(fileIcon);
-			this.art.show();
+			// Get Image Size
+			this._imageSize = {width: pixbuf.get_width(), height: pixbuf.get_height()};
+
+			// Load Image
+			let image = new Clutter.Image();
+			image.set_data(
+				pixbuf.get_pixels(),
+				Cogl.PixelFormat.RGBA_8888,
+				this._imageSize.width,
+				this._imageSize.height,
+				pixbuf.get_rowstride()
+			);
+
+			this.art.set_content(image);
 
 			if (this.debugMode) global.log(`[music-display-additions@nicholasjdi] loaded art from file: ${localPath}`);
 		} catch (e) {
@@ -577,21 +600,56 @@ MusicDisplayAdditionsDesklet.prototype = {
 		// set container size
 		this.container.width = this.xSize;
 		this.container.height = this.ySize;
+		let aspectRatio = this._imageSize.width / this._imageSize.height;
+		let containerRatio = this.xSize / this.ySize
 
 		if (this.artEnabled && !this._hideArt && !this.disabled && !this._failArt) {
-			this._artSize = Math.min(this.xSize - 2 * this.margin, this.ySize - 2 * this.margin);
-			this.art.icon_size = this._artSize;
-			this.art.set_position(this.margin, this.margin);
-			this.backdrop.set_position(this.margin, this.margin);
-			this.backdrop.set_size(this._artSize, this._artSize)
+			if (aspectRatio === containerRatio) {
+				this._artSize = {width: this.xSize - (this.marginSize * 2), height: this.ySize - (this.marginSize * 2)};
+
+				this.margin.set_size(this.xSize, this.ySize)
+				this.art.set_size(this._artSize.width, this._artSize.height);
+				this.backdrop.set_size(this._artSize.width, this._artSize.height)
+
+				this.margin.set_position(0,0)
+				this.art.set_position(this.marginSize, this.marginSize);
+				this.backdrop.set_position(this.marginSize, this.marginSize);
+			} else {
+				let scale = Math.min((this.xSize - (this.marginSize * 2)) / this._imageSize.width,(this.ySize - (this.marginSize * 2)) / this._imageSize.height);
+				this._artSize = {width: this._imageSize.width * scale,height: this._imageSize.height * scale};
+				
+				const W = this._artSize.width;
+				const H = this._artSize.height;
+				const dsW = this.container.width;
+				const dsH = this.container.height;
+				const m = this.marginSize;
+
+				let anchorX = 0, anchorY = 0;
+				switch (this.artPosition) {
+					case "top_left":	 anchorX = m;	anchorY = m; break;
+					case "top_right":	 anchorX = dsW - m - W; anchorY = m; break;
+					case "bottom_left":  anchorX = m;	anchorY = dsH - m - H; break;
+					case "bottom_right": anchorX = dsW - m - W; anchorY = dsH - m - H; break;
+					case "center":		 anchorX = (dsW / 2) - Math.round(W / 2); anchorY = (dsH / 2) - Math.round(H / 2); break;
+					default:			 anchorX = dsW - m - W; anchorY = m; break;
+				}
+
+				this.margin.set_size(this._artSize.width + (this.marginSize * 2), this._artSize.height + (this.marginSize * 2))
+				this.art.set_size(this._artSize.width, this._artSize.height);
+				this.backdrop.set_size(this._artSize.width, this._artSize.height)
+
+				this.margin.set_position(anchorX - this.marginSize, anchorY - this.marginSize)
+				this.art.set_position(anchorX, anchorY);
+				this.backdrop.set_position(anchorX, anchorY);
+			}
 			this.art.show();
 			this.backdrop.style = `background-color: ${this.backgroundColor};`;
-			if (this.margin > 0) this.container.style = `background-color: ${this.marginColor};`;
-			else this.container.style = ``;
+			if (this.marginSize > 0) this.margin.style = `background-color: ${this.marginColor};`;
+			else this.margin.style = ``;
 		} else {
 			this._hideArt = false;
 			this.art.hide();
-			this.container.style = "";
+			this.margin.style = "";
 			this.backdrop.style = "";
 		}
 
@@ -656,41 +714,32 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 				const labelW = this.timeLabel.get_width();
 				const labelH = this.timeLabel.get_height();
-				const dsW = this.container.width;
-				const dsH = this.container.height;
-				const m = this.margin;
+				let dsW = this.xSize;
+				let dsH = this.ySize;
+				if (this.textInArt) {
+					dsW = this._artSize.width + (this.marginSize * 2);
+					dsH = this._artSize.height + (this.marginSize * 2);
+					xOffset += this.margin.position.x
+					yOffset += this.margin.position.y
+				}
+				const m = this.marginSize;
 
 				let anchorX = 0, anchorY = 0;
 				switch (position) {
-					case "top_left":	 anchorX = m;		 anchorY = m;		 break;
-					case "top_right":	 anchorX = dsW - m;	 anchorY = m;		 break;
-					case "bottom_left":  anchorX = m;		 anchorY = dsH - m;	 break;
-					case "bottom_right": anchorX = dsW - m;	 anchorY = dsH - m;	 break;
-					case "center":		 anchorX = dsW / 2;	 anchorY = dsH / 2;	 break;
-					default:			 anchorX = dsW - m;	 anchorY = m;		 break;
+					case "top_left":	 anchorX = m + xOffset;	anchorY = m + yOffset; break;
+					case "top_right":	 anchorX = dsW - m - labelW + xOffset; anchorY = m + yOffset; break;
+					case "bottom_left":  anchorX = m + xOffset;	anchorY = dsH - m - labelH + yOffset; break;
+					case "bottom_right": anchorX = dsW - m - labelW + xOffset; anchorY = dsH - m - labelH + yOffset; break;
+					case "center":		 anchorX = (dsW / 2) - Math.round(labelW / 2) + xOffset; anchorY = (dsH / 2) - Math.round(labelH / 2) + yOffset; break;
+					default:			 anchorX = dsW - m - labelW + xOffset; anchorY = m + yOffset; break;
 				}
 
-				let leftX, topY;
-				if (position.endsWith("_left"))
-					leftX = anchorX + xOffset;
-				else if (position.endsWith("_right"))
-					leftX = anchorX - labelW + xOffset;
-				else
-					leftX = anchorX - Math.round(labelW / 2) + xOffset;
-
-				if (position.startsWith("top"))
-					topY = anchorY + yOffset;
-				else if (position.startsWith("bottom"))
-					topY = anchorY - labelH + yOffset;
-				else
-					topY = anchorY - Math.round(labelH / 2) + yOffset;
-
-				this.timeLabel.set_position(Math.round(leftX), Math.round(topY));
+				this.timeLabel.set_position(Math.round(anchorX), Math.round(anchorY));
 				if (this.outlineEnabled) {
-					this.outlineLabels[0].set_position(Math.round(leftX + this.outlineSize), Math.round(topY));
-					this.outlineLabels[1].set_position(Math.round(leftX - this.outlineSize), Math.round(topY));
-					this.outlineLabels[2].set_position(Math.round(leftX), Math.round(topY - this.outlineSize));
-					this.outlineLabels[3].set_position(Math.round(leftX), Math.round(topY + this.outlineSize));
+					this.outlineLabels[0].set_position(Math.round(anchorX + this.outlineSize), Math.round(anchorY));
+					this.outlineLabels[1].set_position(Math.round(anchorX - this.outlineSize), Math.round(anchorY));
+					this.outlineLabels[2].set_position(Math.round(anchorX), Math.round(anchorY - this.outlineSize));
+					this.outlineLabels[3].set_position(Math.round(anchorX), Math.round(anchorY + this.outlineSize));
 				}
 				return false;
 			})

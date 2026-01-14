@@ -14,7 +14,7 @@
 		"description": "X Size (pixels)",
 		"default": 200,
 		"min": 10,
-		"max": 1000,
+		"max": 10000,
 		"step": 10,
 		"tooltip": "The X Size of the Desklet"
 	},
@@ -23,7 +23,7 @@
 		"description": "Y Size (pixels)",
 		"default": 200,
 		"min": 10,
-		"max": 1000,
+		"max": 10000,
 		"step": 10,
 		"tooltip": "The size of the Margin around Art"
 	},
@@ -119,6 +119,13 @@
 		"tooltip": "Text Y Offset when no Art is found. (not Art Enabled = false)",
 		"dependency": "art_enabled"
 	},
+	"text_in_art":{
+		"type": "checkbox",
+		"description": "Keep text within art",
+		"default": true,
+		"tooltip":"Force text to be within art (for if art is not the same aspect ratio as the desklet)",
+		"dependency": "art_enabled"
+	},
 	"outline_enabled":{
 		"type": "checkbox",
 		"description": "Outline Enabled",
@@ -173,6 +180,19 @@
 		"default": "black",
 		"tooltip": "The Color above the Margin, behind Art. (this is for if art is transparent. tranparent Background Color shows Margin Color)"
 	},
+	"art_position": {
+		"type": "combobox",
+		"description": "Position",
+		"default": "top_right",
+		"options": {
+			"Top Left": "top_left",
+			"Top Right": "top_right",
+			"Bottom Left": "bottom_left",
+			"Bottom Right": "bottom_right",
+			"Center": "center"
+		},
+		"tooltip": "Art Anchor Position (for if art is not the same aspect ratio as the desklet)"
+	},
 	"overrides_enabled":{
 		"type": "checkbox",
 		"description": "Overrides Enabled",
@@ -202,7 +222,7 @@
 		"type": "scale",
 		"description": "Time polling interval (seconds)",
 		"tooltip": "How often the desklet checks Time and Art. (Lower values makes time grabbing more accurate)",
-		"default": 0.5,
+		"default": 1,
 		"min": 0.1,
 		"max": 1,
 		"step": 0.1
