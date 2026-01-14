@@ -113,6 +113,8 @@ The X and Y Offset of the Text from the Anchor Position.
 The Anchor Position of the Text when no Art is found, (not Art Enabled = false) Values are: Top Left, Top Right, Bottom Left, Bottom Right, Center.
 #### No Art X/Y Offset
 The X and Y Offset of the Text from the Anchor Position when no Art is found. (not Art Enabled = false) 
+#### Keep Text Within Art
+Anchor Text within Art when Art is not the same aspect ratio as the Desklet.
 #### Outline Enabled
 Whether or not Text Outline is Enabled.
 #### Outline Size
@@ -130,6 +132,8 @@ The Color of the Margin around Art.
 The Color above the Margin, behind Art. (for if Art is transparent)
 #### Overrides Enabled
 Whether or not Per Track Art Overrides are Enabled.
+#### Position
+The Anchor Position of Art when Art is not the same aspect ratio as the Desklet. (not Art Enabled = false) Values are: Top Left, Top Right, Bottom Left, Bottom Right, Center.
 #### Art Override Directory
 The Directory to fetch Art Overrides from, Files are formatted as "(Artist) - (Title).png" so "Lemmino - Cipher.png" for example. (jpg and webp are also supported.)
 #### Mix Detection
