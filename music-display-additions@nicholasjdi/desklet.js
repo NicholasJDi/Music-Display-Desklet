@@ -499,7 +499,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 				}
 				this._loadArtFromFile(artUrl);
 			}
-		} catch (e) {global.logError(`[music-display-additions@nicholasjdi] _setTimeText exception: ${e}`);}
+		} catch (e) {global.logError(`[music-display-additions@nicholasjdi] _setArt exception: ${e}`);}
 	},
 
 	_loadArtFromFile: function (artPath) {
@@ -542,7 +542,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 			if (this.debugMode) global.log(`[music-display-additions@nicholasjdi] loaded art from file: ${localPath}`);
 		} catch (e) {
-			global.logWarning(`[music-display-additions@nicholasjdi] Could not load art from file: ${artPath}, Error: ${e.message}`);
+			global.logWarning(`[music-display-additions@nicholasjdi] Could not load art from file: ${artPath}, Error: ${e}`);
 			this._hideArt = true;
 		} finally {
 			this._updateLayout();
@@ -557,41 +557,37 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 			// Send asynchronously
 			this._soupSession.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null, (sess, res) => {
-				try {
-					// Get bytes from response
-					let bytes = this._soupSession.send_and_read_finish(res);
-					// Check status code
-					if (message.get_status() !== Soup.Status.OK) {
-						global.logWarning(`[music-display-additions@nicholasjdi] Failed to download image: ${artUrl} status ${message.get_status()}`);
-						this._hideArt = true;
-						return true;
-					}
-
-					// Grab url hash
-					const hash = GLib.compute_checksum_for_string(
-						GLib.ChecksumType.SHA256,
-						artUrl,
-						-1
-					).substring(0,16);
-
-					// Save to temp file
-					let tmpPath = GLib.build_filenamev([GLib.get_tmp_dir(), `music_display_art_${hash}.png`]);
-					GLib.file_set_contents(tmpPath, bytes.get_data());
-
-					if (this.debugMode) {
-						global.log(`[music-display-additions@nicholasjdi] grabbed art from url: ${artUrl}`);
-					}
-
-					// Load it as local file
-					this._loadArtFromFile(tmpPath);
-					GLib.unlink(tmpPath);
-				} catch (e) {
-					global.logWarning(`[music-display-additions@nicholasjdi] Error reading response: ${e.message}`);
+				// Get bytes from response
+				let bytes = this._soupSession.send_and_read_finish(res);
+				// Check status code
+				if (message.get_status() !== Soup.Status.OK) {
+					global.logWarning(`[music-display-additions@nicholasjdi] Failed to download image: ${artUrl} status ${message.get_status()}`);
 					this._hideArt = true;
+					return true;
 				}
+
+				// Grab url hash
+				const hash = GLib.compute_checksum_for_string(
+					GLib.ChecksumType.SHA256,
+					artUrl,
+					-1
+				).substring(0,16);
+
+				// Save to temp file
+				let tmpPath = GLib.build_filenamev([GLib.get_tmp_dir(), `music_display_art_${hash}.png`]);
+				GLib.file_set_contents(tmpPath, bytes.get_data());
+
+				if (this.debugMode) {
+					global.log(`[music-display-additions@nicholasjdi] grabbed art from url: ${artUrl}`);
+				}
+
+				// Load it as local file
+				this._loadArtFromFile(tmpPath);
+				GLib.unlink(tmpPath);
+				
 			});
 		} catch (e) {
-			global.logWarning(`[music-display-additions@nicholasjdi] Could not load art from URL: ${artUrl}, Error: ${e.message}`);
+			global.logWarning(`[music-display-additions@nicholasjdi] Could not load art from URL: ${artUrl}, Error: ${e}`);
 			this._hideArt = true;
 		} finally {if (this._hideArt) this._updateLayout();}
 	},
