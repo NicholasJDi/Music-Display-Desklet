@@ -483,7 +483,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	_setArt: function (artUrl) {
 		try {
-			if (!artUrl || artUrl === "") {
+			if (!artUrl || artUrl.trim() === "") {
 				this._hideArt = true;
 				this._updateLayout();
 				return true;
@@ -507,7 +507,6 @@ MusicDisplayAdditionsDesklet.prototype = {
 			if (!artPath) {
 				this._hideArt = true;
 				this._updateLayout();
-				this.art.set_content(null);
 				return true;
 			}
 
@@ -516,17 +515,30 @@ MusicDisplayAdditionsDesklet.prototype = {
 			if (!GLib.file_test(localPath, GLib.FileTest.EXISTS)) {
 				global.logWarning(`[music-display-additions@nicholasjdi] File does not exist: ${localPath}`);
 				this._hideArt = true;
+				this._updateLayout();
 				return true;
 			}
 
+			const MAX_SIZE = 4096;
+			let maxW = this.xSize - (this.marginSize * 2);
+			let maxH = this.ySize - (this.marginSize * 2);
+			maxW = Math.min(maxW, MAX_SIZE);
+			maxH = Math.min(maxH, MAX_SIZE);
+
 			// Normalize Image To RGBA
-			let pixbuf = GdkPixbuf.Pixbuf.new_from_file(localPath);
+			let pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+				localPath,
+				maxW,
+				maxH,
+				true // preserve aspect ratio
+			);
 			if (!pixbuf.get_has_alpha()) {
 				pixbuf = pixbuf.add_alpha(false, 0, 0, 0);
 			}
 
 			// Get Image Size
 			this._imageSize = {width: pixbuf.get_width(), height: pixbuf.get_height()};
+			this._updateLayout();
 
 			// Load Image
 			let image = new Clutter.Image();
@@ -541,14 +553,13 @@ MusicDisplayAdditionsDesklet.prototype = {
 			this.art.set_content(image);
 
 			if (this.debugMode) global.log(`[music-display-additions@nicholasjdi] loaded art from file: ${localPath}`);
+
 		} catch (e) {
 			global.logWarning(`[music-display-additions@nicholasjdi] Could not load art from file: ${artPath}, Error: ${e}`);
 			this._hideArt = true;
-		} finally {
 			this._updateLayout();
 		}
 	},
-
 
 	_loadArtFromUrl: function (artUrl) {
 		try {
@@ -578,13 +589,13 @@ MusicDisplayAdditionsDesklet.prototype = {
 				GLib.file_set_contents(tmpPath, bytes.get_data());
 
 				if (this.debugMode) {
-					global.log(`[music-display-additions@nicholasjdi] grabbed art from url: ${artUrl}`);
+					global.log(`[music-display-additions@nicholasjdi] grabbed art from url: ${artUrl} to: ${tmpPath}`);
 				}
 
 				// Load it as local file
 				this._loadArtFromFile(tmpPath);
 				GLib.unlink(tmpPath);
-				
+
 			});
 		} catch (e) {
 			global.logWarning(`[music-display-additions@nicholasjdi] Could not load art from URL: ${artUrl}, Error: ${e}`);
@@ -613,7 +624,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 			} else {
 				let scale = Math.min((this.xSize - (this.marginSize * 2)) / this._imageSize.width,(this.ySize - (this.marginSize * 2)) / this._imageSize.height);
 				this._artSize = {width: this._imageSize.width * scale,height: this._imageSize.height * scale};
-				
+
 				const W = this._artSize.width;
 				const H = this._artSize.height;
 				const dsW = this.container.width;
