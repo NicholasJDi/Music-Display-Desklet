@@ -61,6 +61,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this._lastMetadataDump = null;
 		this._lastStatus = null;
 		this._lastTimeText = null;
+		this._lastArtUrl = null;
 		this._soupSession = new Soup.Session();
 		this._pollTimer = null;
 		this._failArt = false;
@@ -197,12 +198,35 @@ MusicDisplayAdditionsDesklet.prototype = {
 		if (!this.disabled) this._startPolling(this.pollInterval);
 	},
 
-	_getPlayerctlArgsArray: function () {
-		if (!this.playerWhitelist.toString().trim()) return [];
-		const players = this.playerWhitelist.split(",").map(p => p.trim()).filter(p => p.length > 0).join(",");
-		if (!players) return [];
-		const flag = this.treatWhitelistAsBlacklist ? `--ignore-player=${players}` : `--player=${players}`;
-		return [flag];
+	_getPlayerctlArgsArray: function (callback) {
+		try {
+			if (!this.playerWhitelist.toString().trim()) return [];
+			const whitelist = this.playerWhitelist.split(",").map(p => p.trim()).filter(p => p.length > 0).join(",");
+			if (!whitelist) return [];
+			this._currentPlayerctlArgs = [this.treatWhitelistAsBlacklist ? `--ignore-player=${whitelist}` : `--player=${whitelist}`]
+			this._runPlayerctlAsync(['-l'], playersOut => {
+				try {
+				// build clean array of reported players
+				const playersList = (playersOut || "").split("\n").map(s => s && s.trim()).filter(Boolean);
+
+				// choose a reported entry where the base name (before '.') matches whitelist (or any if whitelist empty)
+				const pick = playersList.find(p => {
+					if (!p) return false;
+					const base = p.split(".")[0];				 // normalize reported name
+					if (!whitelist.length) return true;			 // no whitelist => accept first valid
+					return this.treatWhitelistAsBlacklist
+						? !whitelist.includes(base)
+						: whitelist.includes(base);
+				}) || null; // null means no concrete pick
+
+				// normalise to base name (e.g. firefox.12345 -> firefox)
+				const firstPlayer = pick ? pick.split(".")[0] : "Player";
+				callback([this.treatWhitelistAsBlacklist ? `--ignore-player=${firstPlayer}` : `--player=${firstPlayer}`]);
+				} catch (e) {global.logError(`[music-display@nicholasjdi] _getPlayerctlArgsArray exception: ${e}`);}
+			});
+		} catch (e) {
+			global.logError(`[music-display@nicholasjdi] _getPlayerctlArgsArray exception: ${e}`);
+		}
 	},
 
 	// this function is so unintelligible
@@ -285,83 +309,84 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	_updateStatus: function () {
 		try {
-			this._currentPlayerctlArgs = this._getPlayerctlArgsArray();
-			this._runPlayerctlAsync(['status'], statusOut => {
-				const status = statusOut ? statusOut.trim() : "";
+			this._getPlayerctlArgsArray(argsOut => {
+				this._currentPlayerctlArgs = argsOut
+				this._runPlayerctlAsync(['status'], statusOut => {
+					const status = statusOut ? statusOut.trim() : "";
 
-				// check if we need to change polling interval
-				const newInterval = (status && status !== "Stopped")
-					? this.pollInterval
-					: this.idlePollInterval;
+					// check if we need to change polling interval
+					const newInterval = (status && status !== "Stopped")
+						? this.pollInterval
+						: this.idlePollInterval;
 
-				if (newInterval !== this._currentInterval && this._lastStatus) {
-					this._startPolling(newInterval);
-				}
+					if (newInterval !== this._currentInterval && this._lastStatus) {
+						this._startPolling(newInterval);
+					}
 
-				const statusChanged = (status !== this._lastStatus);
-				this._lastStatus = status;
+					const statusChanged = (status !== this._lastStatus);
+					this._lastStatus = status;
 
-				if (!status || status === "Stopped") {
-					// No Player / Stopped
-					this._setTimeText();
-					this._setArt("");
-				} else {
-					// Playing / Paused
+					if (!status || status === "Stopped") {
+						// No Player / Stopped
+						this._setTimeText();
+						this._setArt("");
+					} else {
+						// Playing / Paused
 
-					// Update time
-					if (this.textEnabled) this._updateTime();
-					else this._setTimeText("");
-					// Update art
-					if (this.artEnabled && !this.disabled) {
-						this._runPlayerctlAsync(['metadata'], metadataDump => {
-							const dump = metadataDump || "";
+						// Update time
+						if (this.textEnabled) this._updateTime();
+						else this._setTimeText("");
+						// Update art
+						if (this.artEnabled && !this.disabled) {
+							this._runPlayerctlAsync(['metadata'], metadataDump => {
+								const dump = metadataDump || "";
 
-							const metadataChanged = (dump !== this._lastMetadataDump);
-							this._lastMetadataDump = dump;
+								const metadataChanged = (dump !== this._lastMetadataDump);
+								this._lastMetadataDump = dump;
 
-
-							if (statusChanged || metadataChanged) {
-								if (this.debugMode) {
-									global.log(`[music-display-additions@nicholasjdi] art update triggered (statusChanged=${statusChanged}, metadataChanged=${metadataChanged})`);
-								}
-								this._lastMixTitle = null;
-								// yes this is a stupid way to do this but i can't think of a better way
-								if (this.mixDetection && this.overridesEnabled) {
+								if (statusChanged || metadataChanged) {
+									if (this.debugMode) {
+										global.log(`[music-display-additions@nicholasjdi] art update triggered (statusChanged=${statusChanged}, metadataChanged=${metadataChanged})`);
+									}
+									this._lastMixTitle = null;
+									// yes this is a stupid way to do this but i can't think of a better way
+									if (this.mixDetection && this.overridesEnabled) {
+										this._runPlayerctlAsync(['metadata','xesam:comment'], comment => {
+											if (comment.includes('[') && comment.includes(']: ')) {
+												this._runPlayerctlAsync(['position'], time => {
+													const mixTitle = this._grabMixTitleOverride(comment,time);
+													this._lastMixTitle = mixTitle;
+													this._updateArt(mixTitle);
+												});
+											} else this._updateArt();
+										});
+									} else this._updateArt();
+								} else if (this.mixDetection && this.overridesEnabled) {
 									this._runPlayerctlAsync(['metadata','xesam:comment'], comment => {
 										if (comment.includes('[') && comment.includes(']: ')) {
 											this._runPlayerctlAsync(['position'], time => {
 												const mixTitle = this._grabMixTitleOverride(comment,time);
-												this._lastMixTitle = mixTitle;
-												this._updateArt(mixTitle);
-											});
-										} else this._updateArt();
-									});
-								} else this._updateArt();
-							} else if (this.mixDetection && this.overridesEnabled) {
-								this._runPlayerctlAsync(['metadata','xesam:comment'], comment => {
-									if (comment.includes('[') && comment.includes(']: ')) {
-										this._runPlayerctlAsync(['position'], time => {
-											const mixTitle = this._grabMixTitleOverride(comment,time);
-											if (mixTitle != this._lastMixTitle) {
-												if (this.debugMode) {
-													global.log(`[music-display-additions@nicholasjdi] art update triggered because the track is a mix`);
+												if (mixTitle != this._lastMixTitle) {
+													if (this.debugMode) {
+														global.log(`[music-display-additions@nicholasjdi] art update triggered because the track is a mix`);
+													}
+													this._lastMixTitle = mixTitle;
+													this._updateArt(mixTitle);
 												}
-												this._lastMixTitle = mixTitle;
-												this._updateArt(mixTitle);
+											});
+										} else {
+											if (this.debugMode) {
+												global.log(`[music-display-additions@nicholasjdi] no change in metadata/status, (and track is not a mix) skipping art update`);
 											}
-										});
-									} else {
-										if (this.debugMode) {
-											global.log(`[music-display-additions@nicholasjdi] no change in metadata/status, (and track is not a mix) skipping art update`);
 										}
-									}
-								});
-							} else if (this.debugMode) {
-								global.log(`[music-display-additions@nicholasjdi] no change in metadata/status, skipping art update`);
-							}
-						});
-					} else this._setArt("");
-				}
+									});
+								} else if (this.debugMode) {
+									global.log(`[music-display-additions@nicholasjdi] no change in metadata/status, skipping art update`);
+								}
+							});
+						} else this._setArt("");
+					}
+				});
 			});
 		} catch (e) {
 			global.logError(`[music-display-additions@nicholasjdi] _updateStatus exception: ${e}`);
@@ -488,6 +513,11 @@ MusicDisplayAdditionsDesklet.prototype = {
 				this._updateLayout();
 				return true;
 			}
+			if (artUrl === this._lastArtUrl) {
+				this._updateLayout();
+				return true;
+			}
+			this._lastArtUrl = artUrl;
 			if (artUrl.startsWith("https://")) {
 				if (this.debugMode) {
 					global.log(`[music-display-additions@nicholasjdi] parsing art from url: ${artUrl}`);
@@ -503,62 +533,73 @@ MusicDisplayAdditionsDesklet.prototype = {
 	},
 
 	_loadArtFromFile: function (artPath) {
-		try {
-			if (!artPath) {
-				this._hideArt = true;
-				this._updateLayout();
-				return true;
-			}
+		let timeout = this._artTimeout = GLib.timeout_add(
+			GLib.PRIORITY_DEFAULT_IDLE,
+			0,
+			Lang.bind(this, function () {
+				if (timeout) {
+					GLib.source_remove(timeout);
+					timeout = null;
+				}
 
-			// Normalize path
-			let localPath = artPath.replace("file://", "");
-			if (!GLib.file_test(localPath, GLib.FileTest.EXISTS)) {
-				global.logWarning(`[music-display-additions@nicholasjdi] File does not exist: ${localPath}`);
-				this._hideArt = true;
-				this._updateLayout();
-				return true;
-			}
+				try {
+					if (!artPath) {
+						this._hideArt = true;
+						this._updateLayout();
+						return true;
+					}
 
-			const MAX_SIZE = 4096;
-			let maxW = this.xSize - (this.marginSize * 2);
-			let maxH = this.ySize - (this.marginSize * 2);
-			maxW = Math.min(maxW, MAX_SIZE);
-			maxH = Math.min(maxH, MAX_SIZE);
+					// Normalize path
+					let localPath = artPath.replace("file://", "");
+					if (!GLib.file_test(localPath, GLib.FileTest.EXISTS)) {
+						global.logWarning(`[music-display-additions@nicholasjdi] File does not exist: ${localPath}`);
+						this._hideArt = true;
+						this._updateLayout();
+						return true;
+					}
 
-			// Normalize Image To RGBA
-			let pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-				localPath,
-				maxW,
-				maxH,
-				true // preserve aspect ratio
-			);
-			if (!pixbuf.get_has_alpha()) {
-				pixbuf = pixbuf.add_alpha(false, 0, 0, 0);
-			}
+					const MAX_SIZE = 4096;
+					let maxW = this.xSize - (this.marginSize * 2);
+					let maxH = this.ySize - (this.marginSize * 2);
+					maxW = Math.min(maxW, MAX_SIZE);
+					maxH = Math.min(maxH, MAX_SIZE);
 
-			// Get Image Size
-			this._imageSize = {width: pixbuf.get_width(), height: pixbuf.get_height()};
-			this._updateLayout();
+					// Normalize Image To RGBA
+					let pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+						localPath,
+						maxW,
+						maxH,
+						true // preserve aspect ratio
+					);
+					if (!pixbuf.get_has_alpha()) {
+						pixbuf = pixbuf.add_alpha(false, 0, 0, 0);
+					}
 
-			// Load Image
-			let image = new Clutter.Image();
-			image.set_data(
-				pixbuf.get_pixels(),
-				Cogl.PixelFormat.RGBA_8888,
-				this._imageSize.width,
-				this._imageSize.height,
-				pixbuf.get_rowstride()
-			);
+					// Get Image Size
+					this._imageSize = {width: pixbuf.get_width(), height: pixbuf.get_height()};
+					this._updateLayout();
 
-			this.art.set_content(image);
+					// Load Image
+					let image = new Clutter.Image();
+					image.set_data(
+						pixbuf.get_pixels(),
+						Cogl.PixelFormat.RGBA_8888,
+						this._imageSize.width,
+						this._imageSize.height,
+						pixbuf.get_rowstride()
+					);
 
-			if (this.debugMode) global.log(`[music-display-additions@nicholasjdi] loaded art from file: ${localPath}`);
+					this.art.set_content(image);
 
-		} catch (e) {
-			global.logWarning(`[music-display-additions@nicholasjdi] Could not load art from file: ${artPath}, Error: ${e}`);
-			this._hideArt = true;
-			this._updateLayout();
-		}
+					if (this.debugMode) global.log(`[music-display-additions@nicholasjdi] loaded art from file: ${localPath}`);
+
+				} catch (e) {
+					global.logWarning(`[music-display-additions@nicholasjdi] Could not load art from file: ${artPath}, Error: ${e}`);
+					this._hideArt = true;
+					this._updateLayout();
+				}
+			})
+		);
 	},
 
 	_loadArtFromUrl: function (artUrl) {
@@ -772,6 +813,10 @@ MusicDisplayAdditionsDesklet.prototype = {
 		if (this._posTimeout) {
 			GLib.source_remove(this._posTimeout);
 			this._posTimeout = null;
+		}
+		if (this._artTimeout) {
+			GLib.source_remove(this._artTimeout);
+			this._artTimeout = null;
 		}
 		if (this._pollTimer) {
 			GLib.source_remove(this._pollTimer);
