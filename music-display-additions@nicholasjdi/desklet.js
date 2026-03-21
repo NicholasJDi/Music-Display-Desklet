@@ -604,39 +604,81 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	_loadArtFromUrl: function (artUrl) {
 		try {
+			// Grab url hash
+			const hash = GLib.compute_checksum_for_string(
+				GLib.ChecksumType.SHA256,
+				artUrl,
+				-1
+			).substring(0,24);
+
+			// Build file path
+			const cacheDir = GLib.build_filenamev([
+				GLib.get_user_cache_dir(),
+				"music-display"
+			]);
+			GLib.mkdir_with_parents(cacheDir, 0o755);
+			const cachePath = GLib.build_filenamev([
+				cacheDir,
+				`art_${hash}.png`
+			]);
+
+
+			const maxAge = 60 * 60; // 1 hour
+
+
+			if (GLib.file_test(cachePath, GLib.FileTest.EXISTS)) {
+				const file = Gio.File.new_for_path(cachePath);
+
+				const info = file.query_info(
+					'time::modified',
+					Gio.FileQueryInfoFlags.NONE,
+					null
+				);
+
+				const mtime = info.get_attribute_uint64('time::modified');
+				const now = Math.floor(Date.now() / 1000);
+
+				if ((now - mtime) < maxAge) {
+					if (this.debugMode) {
+						global.log(`[music-display-additions@nicholasjdi] art url: ${artUrl} is already cached at: ${cachePath} skipping download`);
+					}
+					this._loadArtFromFile(cachePath);
+					return true;
+				} else {
+					if (this.debugMode) {
+						global.log(`[music-display-additions@nicholasjdi] art url: ${artUrl} is already cached at: ${cachePath} but is older than the max age`);
+					}
+				}
+			}
+
 			// Build GET message
 			let message = Soup.Message.new('GET', artUrl);
 
 			// Send asynchronously
 			this._soupSession.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null, (sess, res) => {
-				// Get bytes from response
-				let bytes = this._soupSession.send_and_read_finish(res);
-				// Check status code
-				if (message.get_status() !== Soup.Status.OK) {
-					global.logWarning(`[music-display-additions@nicholasjdi] Failed to download image: ${artUrl} status ${message.get_status()}`);
+				try {
+					// Get bytes from response
+					const bytes = this._soupSession.send_and_read_finish(res);
+					// Check status code
+					if (message.get_status() !== Soup.Status.OK) {
+						global.logWarning(`[music-display-additions@nicholasjdi] Failed to download image: ${artUrl} status ${message.get_status()}`);
+						this._hideArt = true;
+						return true;
+					}
+
+					// Save to cache
+					GLib.file_set_contents(cachePath, bytes.get_data());
+
+					if (this.debugMode) {
+						global.log(`[music-display-additions@nicholasjdi] grabbed art from url: ${artUrl} to: ${cachePath}`);
+					}
+
+					// Load it as local file
+					this._loadArtFromFile(cachePath);
+				} catch (e) {
+					global.logWarning(`[music-display-additions@nicholasjdi] Could not load art from URL: ${artUrl}, Error: ${e}`);
 					this._hideArt = true;
-					return true;
 				}
-
-				// Grab url hash
-				const hash = GLib.compute_checksum_for_string(
-					GLib.ChecksumType.SHA256,
-					artUrl,
-					-1
-				).substring(0,16);
-
-				// Save to temp file
-				let tmpPath = GLib.build_filenamev([GLib.get_tmp_dir(), `music_display_art_${hash}.png`]);
-				GLib.file_set_contents(tmpPath, bytes.get_data());
-
-				if (this.debugMode) {
-					global.log(`[music-display-additions@nicholasjdi] grabbed art from url: ${artUrl} to: ${tmpPath}`);
-				}
-
-				// Load it as local file
-				this._loadArtFromFile(tmpPath);
-				GLib.unlink(tmpPath);
-
 			});
 		} catch (e) {
 			global.logWarning(`[music-display-additions@nicholasjdi] Could not load art from URL: ${artUrl}, Error: ${e}`);
@@ -648,8 +690,8 @@ MusicDisplayAdditionsDesklet.prototype = {
 		// set container size
 		this.container.width = this.xSize;
 		this.container.height = this.ySize;
-		let aspectRatio = this._imageSize.width / this._imageSize.height;
-		let containerRatio = this.xSize / this.ySize
+		const aspectRatio = this._imageSize.width / this._imageSize.height;
+		const containerRatio = this.xSize / this.ySize
 
 		if (this.artEnabled && !this._hideArt && !this.disabled && !this._failArt) {
 			if (aspectRatio === containerRatio) {
@@ -706,19 +748,19 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	_updateFont: function () {
 		// parse the font string from the settings
-		let desc = Pango.font_description_from_string(this.font);
+		const desc = Pango.font_description_from_string(this.font);
 
 		// get family
-		let family = desc.get_family();
+		const family = desc.get_family();
 		// get size in points
-		let size = desc.get_size() / Pango.SCALE; // Pango stores size*Pango.SCALE
+		const size = desc.get_size() / Pango.SCALE; // Pango stores size*Pango.SCALE
 		// get weight and style
-		let weight = desc.get_weight(); // e.g. 400, 700 etc.
-		let style = desc.get_style();	// 0 = normal, 1 = oblique, 2 = italic
+		const weight = desc.get_weight(); // e.g. 400, 700 etc.
+		const style = desc.get_style();	// 0 = normal, 1 = oblique, 2 = italic
 
 		// turn weight/style into CSS-friendly strings
-		let weightStr = (weight >= Pango.Weight.BOLD) ? 'bold' : 'normal';
-		let styleStr = (style === Pango.Style.ITALIC) ? 'italic'
+		const weightStr = (weight >= Pango.Weight.BOLD) ? 'bold' : 'normal';
+		const styleStr = (style === Pango.Style.ITALIC) ? 'italic'
 						: (style === Pango.Style.OBLIQUE) ? 'oblique' : 'normal';
 
 		// now build a style string for St.Label
