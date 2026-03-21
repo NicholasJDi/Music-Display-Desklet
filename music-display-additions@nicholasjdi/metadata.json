@@ -2,6 +2,6 @@
 	"uuid": "music-display-additions@nicholasjdi",
 	"name": "Music Display Additions",
 	"description": "A Linux Mint Cinnamon Desklet for displaying the current Time and Art of Tracks from Players supporting the MPRIS D-Bus specification using playerctl",
-	"version": "1.5.6",
+	"version": "1.6.0",
 	"author": "NicholasJDi"
 }

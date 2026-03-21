@@ -327,7 +327,7 @@ MusicDisplayDesklet.prototype = {
 		return [flag];
 	},
 
-	// this function is so unintelligible 
+	// this function is so unintelligible
 	_runPlayerctlAsync: function (argsArray, callback) {
 		try {
 			const argv = ['playerctl', ...this._currentPlayerctlArgs, ...argsArray];
@@ -515,7 +515,7 @@ MusicDisplayDesklet.prototype = {
 										global.log(`[music-display@nicholasjdi] Updating text: ${title}, ${artist}, ${album}, ${playerName}.`);
 									}
 									this._lastText = currentText;
-									
+
 									this.labelTitle.set_text(final1);
 									this.labelArtist.set_text(final2);
 								}
