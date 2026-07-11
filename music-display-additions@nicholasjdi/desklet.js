@@ -407,6 +407,10 @@ MusicDisplayAdditionsDesklet.prototype = {
 				this._runPlayerctlAsync(['position'], timeOut => {
 					this._runPlayerctlAsync(['metadata', 'mpris:length'], lengthOut => {
 						lengthOut = lengthOut / 1000000
+						if (Math.floor(lengthOut) === 0) {
+							this._setTimeText("");
+							return;
+						}
 						const timeSeconds = Math.floor(timeOut);
 						const timeMinutes = Math.floor(timeOut / 60);
 						const timeHours = Math.floor(timeOut / 3600);
