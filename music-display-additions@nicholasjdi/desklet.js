@@ -198,6 +198,10 @@ MusicDisplayAdditionsDesklet.prototype = {
 		if (!this.disabled) this._startPolling(this.pollInterval);
 	},
 
+	_checkPlayerctlInstalled: function () {
+		return !!GLib.find_program_in_path("playerctl");
+	},
+
 	_getPlayerctlArgsArray: function (callback) {
 		try {
 			if (!this.playerWhitelist.toString().trim()) return [];
@@ -222,10 +226,10 @@ MusicDisplayAdditionsDesklet.prototype = {
 				// normalise to base name (e.g. firefox.12345 -> firefox)
 				const firstPlayer = pick ? pick.split(".")[0] : "Player";
 				callback([this.treatWhitelistAsBlacklist ? `--ignore-player=${firstPlayer}` : `--player=${firstPlayer}`]);
-				} catch (e) {global.logError(`[music-display@nicholasjdi] _getPlayerctlArgsArray exception: ${e}`);}
+				} catch (e) {global.logError(`[music-display-additions@nicholasjdi] _getPlayerctlArgsArray exception: ${e}`);}
 			});
 		} catch (e) {
-			global.logError(`[music-display@nicholasjdi] _getPlayerctlArgsArray exception: ${e}`);
+			global.logError(`[music-display-additions@nicholasjdi] _getPlayerctlArgsArray exception: ${e}`);
 		}
 	},
 
@@ -245,12 +249,12 @@ MusicDisplayAdditionsDesklet.prototype = {
 					let [ok, stdout, stderr] = procObj.communicate_utf8_finish(res);
 					callback(ok && stdout ? stdout.toString().trim() : "");
 				} catch (e) {
-					global.logError(`[music-display@nicholasjdi] _runPlayerctlAsync exception: ${e}`);
+					global.logError(`[music-display-additions@nicholasjdi] _runPlayerctlAsync exception: ${e}`);
 					callback("");
 				}
 			});
 		} catch (e) {
-			global.logError(`[music-display@nicholasjdi] _runPlayerctlAsync exception: ${e}`);
+			global.logError(`[music-display-additions@nicholasjdi] _runPlayerctlAsync exception: ${e}`);
 			callback("");
 		}
 	},
@@ -309,6 +313,9 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	_updateStatus: function () {
 		try {
+			if (!this._checkPlayerctlInstalled()) {
+				return true;
+			}
 			this._getPlayerctlArgsArray(argsOut => {
 				this._currentPlayerctlArgs = argsOut
 				this._runPlayerctlAsync(['status'], statusOut => {
@@ -407,6 +414,10 @@ MusicDisplayAdditionsDesklet.prototype = {
 				this._runPlayerctlAsync(['position'], timeOut => {
 					this._runPlayerctlAsync(['metadata', 'mpris:length'], lengthOut => {
 						lengthOut = lengthOut / 1000000
+						if (Math.floor(lengthOut) === 0) {
+							this._setTimeText("");
+							return;
+						}
 						const timeSeconds = Math.floor(timeOut);
 						const timeMinutes = Math.floor(timeOut / 60);
 						const timeHours = Math.floor(timeOut / 3600);

@@ -27,10 +27,10 @@ MusicDisplayDesklet.prototype = {
 		this.line1Color = "white";
 		this.line2Color = "white";
 
-		this.line1_no_player = "No player running";
-		this.line2_no_player = "";
-		this.line1_stopped = "Player %player% is stopped";
-		this.line2_stopped = "";
+		this.line1NoPlayer = "No player running";
+		this.line2NoPlayer = "";
+		this.line1Stopped = "Player %player% is stopped";
+		this.line2Stopped = "";
 
 		this.mixDetection = false;
 		this.emptyValues = "Unknown,None,N/A,0"
@@ -42,8 +42,6 @@ MusicDisplayDesklet.prototype = {
 
 		this.playerWhitelist = "rhythmbox,spotify";
 		this.treatWhitelistAsBlacklist = false;
-		this.pollInterval = 1;
-		this.idlePollInterval = 3;
 
 		this.debugMode = false;
 
@@ -59,25 +57,34 @@ MusicDisplayDesklet.prototype = {
 		this.nextPreviousMenuItemsVisible = true
 		this.stopPlayerMenuItemVisible = true
 
-		// Track last displayed info
-		this._lastStatus = null;
-		this._lastPlayPauseFile = null;
-		this._lastMetadataDump = null;
-		this._lastText = null;
-		this._lastMixTitle = null;
+		// Tag Regex
+		this.TAG_REGEX = /^(?:(lc|uc|duration|markup_escape|default|emoji|trunc|)\((.+)\)|([A-Za-z0-9]+:[A-Za-z0-9]+|position|volume|status|loop|shuffle|playerName))$/i;
+		this.PLAYERCTL_END = '⹳Ḓ聉飪狮୳欖叁⚟ᦎ멭஺莎혠濨';
+		this.PLAYERCTL_SPLIT = 'ꡉ弄⛟퐂�掙᭻淛ᛈ䔻뇉况륚賈';
+
+		// Cache
+		this._playerctlProcesses = {};
+		this._playerctlArgs = [];
 		this._currentPlayer = null;
-		this._currentPlayerctlArgs = null;
+		this._line1Format = null;
+		this._line2Format = null;
+		this._status = null;
+		this._mixTitle = null;
+		this._metadata = {};
+		this._metadataTags = [];
+		this._emptyValues = null;
 
-
-		// Polling
-		this._currentInterval = null;
-		this._pollTimer = null;
+		// Soft Cache
+		this._prevNextDone = null;
+		this._lastPlayPauseFile = null;
+		this._lastButtonSize = null;
+		this._lastLine1Text = null;
+		this._lastLine2Text = null;
+		this._lastPlayer = null;
 
 		// Settings
 		this.settings = new Settings.DeskletSettings(this, this.metadata.uuid, instance_id);
-
-		// Bind settings
-		this._bindSettings();
+		this._bindSettings()
 
 		// Layout
 		this.mainBox = new St.BoxLayout({ vertical: false });
@@ -110,7 +117,7 @@ MusicDisplayDesklet.prototype = {
 		this.textVBox = new St.BoxLayout({ vertical: true});
 		this.mainBox.add_child(this.textVBox);
 
-		this.labelTitle = new St.Label({ text: "Loading…" });
+		this.labelTitle = new St.Label({ text: "" });
 		this.textVBox.add_child(this.labelTitle);
 
 		this.labelArtist = new St.Label({ text: "" });
@@ -119,7 +126,9 @@ MusicDisplayDesklet.prototype = {
 		this._buildContextMenu();
 
 		// Initial run
-		this._updateAll();
+		this._updateFont();
+		this.labelTitle.set_text("Loading...");
+		this.labelArtist.set_text("");
 		let timeout = GLib.timeout_add(
 			GLib.PRIORITY_DEFAULT_IDLE,
 			0,
@@ -128,8 +137,8 @@ MusicDisplayDesklet.prototype = {
 					GLib.source_remove(timeout);
 					timeout = null;
 				}
+				this._reload();
 				this._updateStatus();
-				this._startPolling(this.pollInterval);
 			})
 		);
 	},
@@ -147,29 +156,24 @@ MusicDisplayDesklet.prototype = {
 			this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 			// Context Menu Play/Pause Track
 			this.playPauseMenuItem = this._menu.addAction(_('Play/Pause Track'), Lang.bind(this, function () {
-				GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} play-pause`);
-				this._updateStatus();
+				GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} play-pause`);
 			}));
 			// Context Menu Next Track
 			this.nextMenuItem = this._menu.addAction(_('Next Track'), Lang.bind(this, function () {
-				GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} next`);
-				this._updateStatus();
+				GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} next`);
 			}));
 			// Context Menu Previous Track
 			this.previousMenuItem = this._menu.addAction(_('Previous Track'), Lang.bind(this, function () {
-				GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} previous`);
-				this._updateStatus();
+				GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} previous`);
 			}));
 			// Context Menu Stop Player
 			this.stopPlayerMenuItem = this._menu.addAction(_('Stop Player'), Lang.bind(this, function () {
-				GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} stop`);
-				this._updateStatus();
+				GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} stop`);
 			}));
 			this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 			// Context Menu Reload Desklet
 			this.reloadMenuItem = this._menu.addAction(_('Reload'), Lang.bind(this, function () {
-				this._updateAll();
-				this._resetPolling;
+				this._reload();
 			}));
 		}
 		// update open player menu item content
@@ -202,28 +206,40 @@ MusicDisplayDesklet.prototype = {
 		const bind = Lang.bind;
 
 		// Line 1 settings
-		settings.bind("line1_format", "line1Format", bind(this, this._updateAll));
-		settings.bind("line1_font", "line1Font", bind(this, this._updateAll));
-		settings.bind("line1_color", "line1Color", bind(this, this._updateAll));
-		settings.bind("line1_no_player", "line1_no_player", bind(this, this._updateStatus));
-		settings.bind("line1_stopped", "line1_stopped", bind(this, this._updateStatus));
+		settings.bind("line1_format", "line1Format", bind(this, this._parseFormat));
+		settings.bind("line1_font", "line1Font", bind(this, this._updateFont));
+		settings.bind("line1_color", "line1Color", bind(this, this._updateFont));
+		settings.bind("line1_no_player", "line1NoPlayer", bind(this, this._updateText));
+		settings.bind("line1_stopped", "line1Stopped", bind(this, this._updateText));
 
 		// Line 2 settings
-		settings.bind("line2_format", "line2Format", bind(this, this._updateAll));
-		settings.bind("line2_font", "line2Font", bind(this, this._updateAll));
-		settings.bind("line2_color", "line2Color", bind(this, this._updateAll));
-		settings.bind("line2_no_player", "line2_no_player", bind(this, this._updateStatus));
-		settings.bind("line2_stopped", "line2_stopped", bind(this, this._updateStatus));
+		settings.bind("line2_format", "line2Format", bind(this, this._parseFormat));
+		settings.bind("line2_font", "line2Font", bind(this, this._updateFont));
+		settings.bind("line2_color", "line2Color", bind(this,this._updateFont));
+		settings.bind("line2_no_player", "line2NoPlayer", bind(this, this._updateText));
+		settings.bind("line2_stopped", "line2Stopped", bind(this, this._updateText));
 
 		// Button settings
-		settings.bind("btn_play_texture", "btnPlayTexture", bind(this, this._updateAll));
-		settings.bind("btn_pause_texture", "btnPauseTexture", bind(this, this._updateAll));
-		settings.bind("btn_next_texture", "btnNextTexture", bind(this, this._updateAll));
-		settings.bind("btn_prev_texture", "btnPrevTexture", bind(this, this._updateAll));
-		settings.bind("hide_skip_buttons", "hideSkipButtons", bind(this, this._updateAll));
-		settings.bind("hide_all_buttons", "hideAllButtons", bind(this, this._updateAll));
-		settings.bind("button_text_spacing", "buttonTextSpacing", bind(this, this._updateAll));
-		settings.bind("button_size", "buttonSize", bind(this, this._updateAll));
+		settings.bind("btn_play_texture", "btnPlayTexture", () => {
+			this._lastPlayPauseFile = null;
+			this._updateButtons();
+		});
+		settings.bind("btn_pause_texture", "btnPauseTexture", () => {
+			this._lastPlayPauseFile = null;
+			this._updateButtons();
+		});
+		settings.bind("btn_next_texture", "btnNextTexture", () => {
+			this._prevNextDone = null;
+			this._updateButtons();
+		});
+		settings.bind("btn_prev_texture", "btnPrevTexture", () => {
+			this._prevNextDone = null;
+			this._updateButtons();
+		});
+		settings.bind("hide_skip_buttons", "hideSkipButtons", bind(this, this._updateButtons));
+		settings.bind("hide_all_buttons", "hideAllButtons", bind(this, this._updateButtons));
+		settings.bind("button_text_spacing", "buttonTextSpacing", bind(this, this._updateButtons));
+		settings.bind("button_size", "buttonSize", bind(this, this._updateButtons));
 
 		// Context Menu Settings
 		settings.bind("open_player_name", "openPlayerMenuItemName", bind(this, this._buildContextMenu));
@@ -234,103 +250,31 @@ MusicDisplayDesklet.prototype = {
 		settings.bind("stop_player_visible", "stopPlayerMenuItemVisible", bind(this, this._buildContextMenu));
 
 		// Tag settings
-		settings.bind("mix_detection", "mixDetection", bind(this, this._updateAll));
-		settings.bind("empty_values", "emptyValues", bind(this, this._updateAll));
+		settings.bind("mix_detection", "mixDetection", bind(this, this._parseFormat));
+		settings.bind("empty_values", "emptyValues", bind(this, this._updateText));
 
 		// Player settings
-		settings.bind("player_whitelist", "playerWhitelist", bind(this, this._updateAll));
-		settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", bind(this, this._updateAll));
-		settings.bind("poll_interval", "pollInterval", bind(this, this._resetPolling));
-		settings.bind("idle_poll_interval", "idlePollInterval", bind(this, this._resetPolling));
+		settings.bind("player_whitelist", "playerWhitelist", bind(this, this._reload));
+		settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", bind(this, this._reload));
 
 		settings.bind("debug_mode", "debugMode", null);
 	},
 
-	_startPolling: function (interval) {
-		// cancel existing timer if any
-		if (this._pollTimer) {
-			GLib.source_remove(this._pollTimer);
-			this._pollTimer = null;
-		}
-
-		// store and start new timer
-		this._currentInterval = interval;
-		const ms = Math.round(interval * 1000)
-		this._pollTimer = GLib.timeout_add(GLib.PRIORITY_IDLE, ms, Lang.bind(this, this._updateStatus));
-		if (this.debugMode) {
-			global.log(`[music-display@nicholasjdi] resetting poll interval to ${this._currentInterval}s`);
-		}
+	_getPlayerctlArgs: function () {
+		this._playerctlArgs = [
+			this.treatWhitelistAsBlacklist ?
+				'--ignore-player=' :
+				'--player=' +
+				this.playerWhitelist.split(",")
+					.map(s => s.trim())
+					.filter(Boolean)
+					.join(',')
+		];
 	},
 
-	_resetPolling: function () {
-		this._startPolling(this.pollInterval);
-	},
-
-	_updateAll: function () {
-		this.labelTitle.set_text("Loading...");
-		this.labelArtist.set_text("");
-		this._lastStatus = "Reload";
-		this._lastText = null;
-		this._updateFont();
-		this.spacingWidget.width = this.buttonTextSpacing;
-	},
-
-	_updateFont: function () {
-		// parse the font string from the settings
-		let desc1 = Pango.font_description_from_string(this.line1Font);
-		let desc2 = Pango.font_description_from_string(this.line2Font);
-
-		// get family
-		let family1 = desc1.get_family();
-		let family2 = desc2.get_family();
-		// get size in points
-		let size1 = desc1.get_size() / Pango.SCALE;
-		let size2 = desc2.get_size() / Pango.SCALE;
-		// get weight and style
-		let weight1 = desc1.get_weight();
-		let style1 = desc1.get_style();
-		let weight2 = desc2.get_weight();
-		let style2 = desc2.get_style();
-
-		// turn weight/style into CSS-friendly strings
-		let weightStr1 = (weight1 >= Pango.Weight.BOLD) ? 'bold' : 'normal';
-		let styleStr1 = (style1 === Pango.Style.ITALIC) ? 'italic'
-			: (style1 === Pango.Style.OBLIQUE) ? 'oblique' : 'normal';
-		let weightStr2 = (weight2 >= Pango.Weight.BOLD) ? 'bold' : 'normal';
-		let styleStr2 = (style2 === Pango.Style.ITALIC) ? 'italic'
-			: (style2 === Pango.Style.OBLIQUE) ? 'oblique' : 'normal';
-
-		// now build a style string for St.Label
-		this.labelTitle.style =
-			'font-family: ' + family1 + '; ' +
-			'font-weight: ' + weightStr1 + '; ' +
-			'font-style: ' + styleStr1 + '; ' +
-			'font-size: ' + size1 + 'pt; ' +
-			'color: ' + this.line1Color + ';';
-		this.labelArtist.style =
-			'font-family: ' + family2 + '; ' +
-			'font-weight: ' + weightStr2 + '; ' +
-			'font-style: ' + styleStr2 + '; ' +
-			'font-size: ' + size2 + 'pt; ' +
-			'color: ' + this.line2Color + ';';
-
-		if (this.debugMode) {
-			global.log(`[music-display@nicholasjdi] Update font`);
-		}
-	},
-
-	_getPlayerctlArgsArray: function () {
-		if (!this.playerWhitelist.toString().trim()) return [];
-		const players = this.playerWhitelist.split(",").map(p => p.trim()).filter(p => p.length > 0).join(",");
-		if (!players) return [];
-		const flag = this.treatWhitelistAsBlacklist ? `--ignore-player=${players}` : `--player=${players}`;
-		return [flag];
-	},
-
-	// this function is so unintelligible
-	_runPlayerctlAsync: function (argsArray, callback) {
+	_runPlayerctl: function (argsArray, callback) {
 		try {
-			const argv = ['playerctl', ...this._currentPlayerctlArgs, ...argsArray];
+			const argv = ['playerctl', ...this._playerctlArgs, ...argsArray];
 
 			let proc = new Gio.Subprocess({
 				argv: argv,
@@ -343,213 +287,403 @@ MusicDisplayDesklet.prototype = {
 					let [ok, stdout, stderr] = procObj.communicate_utf8_finish(res);
 					callback(ok && stdout ? stdout.toString().trim() : "");
 				} catch (e) {
-					global.logError(`[music-display@nicholasjdi] _runPlayerctlAsync exception: ${e}`);
+					global.logError(`[${this.metadata.uuid}] _runPlayerctl.read exception: ${e}`);
 					callback("");
 				}
 			});
 		} catch (e) {
-			global.logError(`[music-display@nicholasjdi] _runPlayerctlAsync exception: ${e}`);
+			global.logError(`[${this.metadata.uuid}] _runPlayerctl exception: ${e}`);
 			callback("");
 		}
 	},
 
-	_fetchCustomTagsAsync: function (formatStr, callback) {
-		// Quick check: if it doesn't contain all required chars, return the string as-is
-		if (!formatStr.includes('%') || !formatStr.includes('(') || !formatStr.includes(')') || !formatStr.includes('[') || !formatStr.includes(']')) {
-			callback(formatStr);
-			return;
-		}
+	_startPlayerctl: function (id, argsArray, callback, multiLine) {
+		try {
+			const argv = [
+				'playerctl',
+				...this._playerctlArgs,
+				'--follow',
+				...argsArray
+			];
 
-		const emptyValues = (this.emptyValues || "").split(",").map(s => s.trim()).filter(Boolean);
-		let result = "";
-		let idx = 0;
-
-		const processNext = () => {
-			if (idx >= formatStr.length) {
-				callback(result);
-				return;
+			if (this._playerctlProcesses[id]) {
+				this._stopPlayerctl(id);
 			}
 
-			const nextPercent = formatStr.indexOf('%', idx);
-			if (nextPercent === -1) {
-				result += formatStr.slice(idx);
-				callback(result);
-				return;
-			}
+			const proc = Gio.Subprocess.new(
+				argv,
+				Gio.SubprocessFlags.STDOUT_PIPE |
+				Gio.SubprocessFlags.STDERR_PIPE
+			);
 
-			result += formatStr.slice(idx, nextPercent);
-			idx = nextPercent;
+			const stdout = new Gio.DataInputStream({
+				base_stream: proc.get_stdout_pipe()
+			});
 
-			// find closing %
-			let stack = [];
-			let end = idx + 1;
-			let found = false;
-			while (end < formatStr.length) {
-				if (formatStr[end] === '%' && stack.length === 0) {
-					found = true;
-					break;
-				} else if (formatStr[end] === '(') {
-					stack.push('(');
-				} else if (formatStr[end] === ')') {
-					if (stack.length) stack.pop();
-				}
-				end++;
-			}
+			this._playerctlProcesses[id] = {
+				proc,
+				stdout,
+				stopped: false
+			};
 
-			if (!found) {
-				result += formatStr.slice(idx);
-				callback(result);
-				return;
-			}
+			let out = "";
+			const readNext = () => {
+				if (!this._playerctlProcesses[id] ||
+					this._playerctlProcesses[id].stopped)
+					return;
 
-			const tagContent = formatStr.slice(idx + 1, end); // between %…%
-			idx = end + 1;
+				stdout.read_line_async(GLib.PRIORITY_DEFAULT, null, (stream, res) => {
+					try {
+						const follow = this._playerctlProcesses[id];
+						if (!follow || follow.stopped)
+							return;
 
-			// --- stack-aware prefix extraction ---
-			let prefix = "", suffix = "", middle = tagContent;
+						const [line] = stream.read_line_finish_utf8(res);
 
-			if (middle[0] === '(') {
-				let depth = 1, i = 1;
-				while (i < middle.length && depth > 0) {
-					if (middle[i] === '(') depth++;
-					else if (middle[i] === ')') depth--;
-					i++;
-				}
-				prefix = middle.slice(1, i - 1); // remove surrounding ()
-				middle = middle.slice(i);		 // rest after prefix
-			}
+						if (line === null)
+							return;
 
-			// stack-aware suffix extraction
-			if (middle[middle.length - 1] === ')') {
-				let depth = 1, j = middle.length - 2;
-				while (j >= 0 && depth > 0) {
-					if (middle[j] === ')') depth++;
-					else if (middle[j] === '(') depth--;
-					j--;
-				}
-				suffix = middle.slice(j + 2, middle.length - 1); // remove surrounding ()
-				middle = middle.slice(0, j + 1);				 // rest before suffix
-			}
+						if (multiLine) {
+							if (line === this.PLAYERCTL_END) {
+								callback(out);
+								out = "";
+							} else if (out === '') out += line;
+							else out += `\n${line}`;
 
-			/// Extract [player]metadataKey
-			const playerMatch = middle.match(/^\s*\[(.*?)\](.*)$/);
-			if (!playerMatch) {
-				result += `%${tagContent}%`; // invalid format
-				processNext();
-				return;
-			}
-
-			const player = playerMatch[1].trim();
-			const metadataKey = playerMatch[2].trim();
-
-			if (!metadataKey || (player && !player.includes(this._currentPlayer))) {
-				processNext();
-				return;
-			}
-
-			// Fetch metadata
-			const fetchMetadata = () => {
-				let args = [];
-				if (this._currentPlayer) args.push(`--player=${this._currentPlayer}`);
-				args.push('metadata', metadataKey);
-
-				this._runPlayerctlAsync(args, val => {
-					if (!val || emptyValues.includes(val.trim())) {
-						processNext();
-						return;
+						} else callback(line);
+						readNext();
+					} catch (e) {
+						global.logError(`[${this.metadata.uuid}] _startPlayerctl.read exception: ${e}`);
 					}
-
-					this._fetchCustomTagsAsync(prefix, finalPrefix => {
-						this._fetchCustomTagsAsync(suffix, finalSuffix => {
-							result += finalPrefix + val + finalSuffix;
-							processNext();
-						});
-					});
 				});
 			};
 
-			if (player === "" || this._currentPlayer) fetchMetadata();
-			else processNext();
-		};
-
-		processNext();
+			readNext();
+		} catch (e) {
+			global.logError(`[${this.metadata.uuid}] _startPlayerctl exception: ${e}`);
+		}
 	},
 
-	_updateText: function (playerName, titleOverride = null) {
+	_stopPlayerctl: function (id) {
+		const follow = this._playerctlProcesses[id];
+		if (!follow)
+			return;
+
+		follow.stopped = true;
+
 		try {
-			const fields = ['xesam:title', 'xesam:artist', 'xesam:album'];
-			const results = {};
-			let pending = fields.length;
+			follow.proc.force_exit();
+		} catch (e) {}
 
-			fields.forEach(field => {
-				this._runPlayerctlAsync(['metadata', field], val => {
-					results[field] = val ||
-						(field === 'xesam:title' ? "Unknown Title" :
-							field === 'xesam:artist' ? "Unknown Artist" : "Unknown Album");
-					pending--;
-					if (pending === 0) {
-						const title = titleOverride || results['xesam:title'];
-						const artist = results['xesam:artist'];
-						const album = results['xesam:album'];
+		delete this._playerctlProcesses[id];
+	},
 
-						let base1 = this.line1Format
-							.replaceAll('%title%', title)
-							.replaceAll('%artist%', artist)
-							.replaceAll('%album%', album)
-							.replaceAll('%player%', playerName);
+	_reload: function () {
+		try {
+			if (!this._checkPlayerctlInstalled()) {
+				for (const process of Object.keys(this._playerctlProcesses)) {
+					this._stopPlayerctl(process);
+				}
+				this.buttonVBox.hide();
+				this.spacingWidget.hide();
+				this.labelTitle.set_text("playerctl is not installed");
+				this.labelArtist.set_text("Use command: sudo apt install playerctl\nRight click this desklet and press 'Reload'");
+				return;
+			} else {
+				this._lastLine1Text = null;
+				this._lastLine2Text = null;
+				this._lastPlayPauseFile = null;
+				this._lastButtonSize = null;
 
-						let base2 = this.line2Format
-							.replaceAll('%title%', title)
-							.replaceAll('%artist%', artist)
-							.replaceAll('%album%', album)
-							.replaceAll('%player%', playerName);
+				this._updateFont();
+				this.labelTitle.set_text("Loading...");
+				this.labelArtist.set_text("");
+				this._getPlayerctlArgs();
+				this._startPlayerctl('status', ['status'], Lang.bind(this, this._updateStatus));
+				this._parseFormat();
+			}
+		} catch (e) {
+			global.logError(`[${this.metadata.uuid}] _reload exception: ${e}`);
+		}
+	},
 
-						base1 = this._applyMixTags(base1, results['xesam:title']);
-						base2 = this._applyMixTags(base2, results['xesam:title']);
+	_updateStatus: function (status) {
+		try {
+			if (status === "Stopped") this._status = null;
+			else if (!status) this._status = undefined;
+			else this._status = status === "Playing";
+			if (this.debugMode) {
+				global.log(`[${this.metadata.uuid}] _updateStatus: ${this._status}${status ? " (" + status + ")" : ''}`);
+			}
+			this._updateButtons();
 
-						this._fetchCustomTagsAsync(base1, final1 => {
-							this._fetchCustomTagsAsync(base2, final2 => {
-								const currentText = `${final1},${final2}`;
-								if (this._lastText !== currentText) {
-									if (this.debugMode) {
-										global.log(`[music-display@nicholasjdi] Updating text: ${title}, ${artist}, ${album}, ${playerName}.`);
-									}
-									this._lastText = currentText;
-
-									this.labelTitle.set_text(final1);
-									this.labelArtist.set_text(final2);
-								}
-							});
-						});
-					}
-				});
+			this._runPlayerctl(['-l'], list => {
+				this._currentPlayer = list.split('\n')[0].split(".", 2)[0];
+				if (this._currentPlayer !== this._lastPlayer) {
+					this._lastPlayer = this._currentPlayer;
+					this._parseFormat();
+				}
+				if (this._status === null || this._status === undefined) this._updateText();
 			});
 		} catch (e) {
-			global.logError(`[music-display@nicholasjdi] _updateText exception: ${e}`);
+			global.logError(`[${this.metadata.uuid}] _updateStatus exception: ${e}`);
 		}
 	},
 
-	_applyMixTags: function (formatStr, normalTitle) {
-		// Only proceed if the mini-syntax might be present
-		if (!formatStr || formatStr.indexOf('%(') === -1 || formatStr.indexOf(')mix(') === -1) {
-			return formatStr;
+	_updateText: function () {
+		this._emptyValues = (this.emptyValues || "").split(",").map(s => s.trim()).filter(Boolean);
+		let line1Text;
+		let line2Text;
+		if (this._status === undefined) {
+			line1Text = this.line1NoPlayer;
+			line2Text = this.line2NoPlayer;
+		} else if (this._status === null) {
+			line1Text = this.line1Stopped.replaceAll('%player%', this._currentPlayer);
+			line2Text = this.line2Stopped.replaceAll('%player%', this._currentPlayer);
+		} else {
+			if (this.mixDetection && this._metadata['xesam:comment'] !== undefined && this._metadata['position'] !== undefined)
+				this._mixTitle = this._getMixTitle(this._metadata['xesam:comment'],this._metadata['position'] / 1000000);
+			else this._mixTitle = null;
+			line1Text = this._buildTag(this._line1Format);
+			line2Text = this._buildTag(this._line2Format);
 		}
 
-		// Matches %(prefix)mix(suffix)% (prefix/suffix may be empty)
-		return formatStr.replace(/%\(([^)]*?)\)mix\(([^)]*?)\)%/g, (match, prefix, suffix) => {
-			// If there is a current mix marker, show the normal title with the prefix/suffix
-			if (this._lastMixTitle != null) {
-				prefix = prefix || "";
-				suffix = suffix || "";
-				return prefix + (normalTitle || "") + suffix;
+		if (line1Text !== this._lastLine1Text) {
+			this._lastLine1Text = line1Text;
+			this.labelTitle.set_text(line1Text);
+		}
+		if (line2Text !== this._lastLine2Text) {
+			this._lastLine2Text = line2Text;
+			this.labelArtist.set_text(line2Text);
+		}
+		if (this.debugMode) {
+			global.log(`[${this.metadata.uuid}] _updateText: {${line1Text}} || {${line2Text}}`);
+		}
+	},
+
+	_buildTag: function (node) {
+		try {
+			if (Array.isArray(node))
+				return node.map(n => this._buildTag(n)).join('');
+
+			if (typeof node === 'string')
+				return node;
+
+			if (node.value) {
+				if (node.players && (
+					node.blacklist ?
+					node.players.includes(this._currentPlayer)
+					: !node.players.includes(this._currentPlayer)
+				)) return "";
+
+				const metadata = this._getMetadata(node.value);
+				if ((metadata && !node.inversed || !metadata && node.inversed) && !this._emptyValues.includes(metadata)) {
+					let out = "";
+
+					if (node.prefix)
+						out += this._buildTag(node.prefix);
+
+					if (!node.conditional)
+						out += metadata;
+
+					if (node.suffix)
+						out += this._buildTag(node.suffix);
+
+					return out
+				}
+			}
+			return ""
+		} catch (e) {
+			global.logError(`[${this.metadata.uuid}] _buildTag exception: ${e}`);
+		}
+	},
+
+	_getMetadata: function (tag) {
+		switch (tag) {
+			case "title":
+				if (this._mixTitle) return this._mixTitle;
+				else return this._metadata['xesam:title'];
+			case "mix":
+				if (this._mixTitle) return  this._metadata['xesam:title'];
+				else return '';
+			case "player":
+				return this._currentPlayer;
+			default:
+				return Object.keys(this._metadata).includes(tag) ? this._metadata[tag] : '';
+		}
+	},
+
+	_parseFormat: function () {
+		try {
+			this._metadataTags = [];
+			this._line1Format = this._parseTags(this.line1Format);
+			this._line2Format = this._parseTags(this.line2Format);
+
+			this._startPlayerctl('metadata', [`--player=${this._currentPlayer || ' -l'}`,
+					'metadata', '--format', [
+						this._metadataTags.map(t => t = '{{' + t + '}}').join(this.PLAYERCTL_SPLIT),
+						`\n${this.PLAYERCTL_END}`
+					].join(''),
+				],
+				tags => this._updateMetadata(tags.split(this.PLAYERCTL_SPLIT)),
+				true
+			);
+		} catch (e) {
+			global.logError(`[${this.metadata.uuid}] _parseFormat exception: ${e}`);
+		}
+	},
+
+	_parseTags: function (text) {
+		const tags = {
+			'title': [
+				'xesam:title',
+				...(this.mixDetection ? ['xesam:comment', 'position'] : [])
+			],
+			'mix': [
+				...(this.mixDetection ? ['xesam:comment', 'position'] : [])
+			],
+			'player':[]
+		};
+
+		let i = 0;
+
+		const parseSequence = (stopChar = null) => {
+			const out = [];
+			let literal = "";
+
+			while (i < text.length) {
+				// reached the end of a recursive section
+				if (stopChar && text[i] === stopChar)
+					break;
+
+				// tag
+				if (text[i] === "%") {
+					if (literal.length) {
+						out.push(literal);
+						literal = "";
+					}
+
+					out.push(parseTag());
+					continue;
+				}
+
+				literal += text[i++];
 			}
 
-			// Otherwise, remove the whole tag
-			return "";
-		});
+			if (literal.length)
+				out.push(literal);
+
+			return out;
+		}
+
+		const parseBalanced = (open, close) => {
+			if (text[i] !== open)
+				return [];
+
+			i++; // skip open
+
+			const result = parseSequence(close);
+
+			if (text[i] !== close)
+				return result;
+
+			i++; // skip close
+
+			return result;
+		}
+
+		const parseTag = () => {
+			if (text[i] !== "%")
+				return {};
+
+			i++; // opening %
+
+			const node = {};
+
+			// prefix
+			if (text[i] === "{") {
+				const prefix = parseBalanced("{", "}");
+				if (prefix.length !== 0) node.prefix = prefix
+			}
+
+			// players
+			if (text[i] === "!") {
+				node.blacklist = true;
+				i++
+			}
+			if (text[i] === "[") {
+				const players = parseBalanced("[", "]").join('');
+				if (players.length !== 0) node.players = players.split(",").map(s => s.trim()).filter(Boolean)
+			}
+
+			// conditionals
+			if (text[i] === "?") {
+				node.conditional = true;
+				i++
+				if (text[i] === "?") {
+					node.inversed = true;
+					i++
+				}
+			}
+
+			// value
+			let value = "";
+			while (
+				i < text.length &&
+				text[i] !== "{" &&
+				text[i] !== "%"
+			) {
+				value += text[i++];
+			}
+
+			if (Object.keys(tags).includes(value.trim()) || this.TAG_REGEX.test(value.trim())){
+				node.value = value.trim();}
+			else {
+				const tag = 'xesam:' + value.trim();
+				if (this.TAG_REGEX.test(tag)) node.value = tag;
+				else return "";
+			}
+
+			// suffix
+			if (text[i] === "{") {
+				const suffix = parseBalanced("{", "}");
+				if (suffix.length !== 0) node.suffix = suffix
+			}
+
+			if (text[i] !== "%")
+				return "";
+
+			i++; // closing %
+
+			// built in tags
+			if (this.TAG_REGEX.test(node.value)) {
+				if (!this._metadataTags.includes(node.value))
+					this._metadataTags.push(node.value);
+			} else {
+				for (const tag of tags[node.value]) {
+					if (!this._metadataTags.includes(tag))
+						this._metadataTags.push(tag);
+				}
+			}
+
+			return node;
+		}
+
+		return parseSequence();
 	},
 
-	_grabMixTitleOverride: function (text, time) {
+	_updateMetadata: function (tags) {
+		try {
+			for (let i = tags.length - 1; i >= 0; i--) {
+				this._metadata[this._metadataTags[i]] = tags[i]
+			}
+			this._updateText()
+		} catch (e) {
+			global.logError(`[${this.metadata.uuid}] _updateText exception: ${e}`);
+		}
+	},
+
+	_getMixTitle: function (text, time) {
 		try {
 			if (!text || text == "") return null;
 			if (!time) return null;
@@ -597,219 +731,121 @@ MusicDisplayDesklet.prototype = {
 
 			return currentTitle;
 		} catch (e) {
-			global.logError(`[music-display@nicholasjdi] _grabMixTitleOverride exception: ${e}`);
+			global.logError(`[${this.metadata.uuid}] _getMixTitle exception: ${e}`);
 		}
 	},
 
-	_updateStatus: function () {
-		try {
-			if (!this._checkPlayerctlInstalled()) {
-				this.labelTitle.set_text("playerctl is not installed");
-				this.labelArtist.set_text("Use command: sudo apt install playerctl");
-				this.buttonVBox.hide();
-				this.spacingWidget.hide();
-				return true;
-			}
-			this._currentPlayerctlArgs = this._getPlayerctlArgsArray();
+	_updateFont: function() {
+		// parse the font string from the settings
+		let desc1 = Pango.font_description_from_string(this.line1Font);
+		let desc2 = Pango.font_description_from_string(this.line2Font);
 
-			this._runPlayerctlAsync(['status'], statusOut => {
-				const status = statusOut ? statusOut.trim() : "";
+		// get family
+		let family1 = desc1.get_family();
+		let family2 = desc2.get_family();
+		// get size
+		let size1 = desc1.get_size() / Pango.SCALE;
+		let size2 = desc2.get_size() / Pango.SCALE;
+		// get weight and style
+		let weight1 = desc1.get_weight();
+		let style1 = desc1.get_style();
+		let weight2 = desc2.get_weight();
+		let style2 = desc2.get_style();
 
-				// check if we need to change polling interval
-				const newInterval = (status && status !== "Stopped")
-					? this.pollInterval
-					: this.idlePollInterval;
+		// turn weight/style into strings
+		let weightStr1 = (weight1 >= Pango.Weight.BOLD) ? 'bold' : 'normal';
+		let styleStr1 = (style1 === Pango.Style.ITALIC) ? 'italic'
+			: (style1 === Pango.Style.OBLIQUE) ? 'oblique' : 'normal';
+		let weightStr2 = (weight2 >= Pango.Weight.BOLD) ? 'bold' : 'normal';
+		let styleStr2 = (style2 === Pango.Style.ITALIC) ? 'italic'
+			: (style2 === Pango.Style.OBLIQUE) ? 'oblique' : 'normal';
 
-				if (newInterval !== this._currentInterval) {
-					this._startPolling(newInterval);
-				}
+		// build St.Lable style string
+		this.labelTitle.style =
+			'font-family: ' + family1 + '; ' +
+			'font-weight: ' + weightStr1 + '; ' +
+			'font-style: ' + styleStr1 + '; ' +
+			'font-size: ' + size1 + 'pt; ' +
+			'color: ' + this.line1Color + ';';
+		this.labelArtist.style =
+			'font-family: ' + family2 + '; ' +
+			'font-weight: ' + weightStr2 + '; ' +
+			'font-style: ' + styleStr2 + '; ' +
+			'font-size: ' + size2 + 'pt; ' +
+			'color: ' + this.line2Color + ';';
 
-				const statusChanged = (status !== this._lastStatus);
-				this._lastStatus = status;
-
-				let showButtons = true;
-
-				if (!status) {
-					// No player
-					this.labelTitle.set_text(this.line1_no_player);
-					this.labelArtist.set_text(this.line2_no_player);
-					showButtons = false;
-					this._lastText = null;
-				} else if (status === "Stopped") {
-					// Player stopped
-					this._runPlayerctlAsync(['-l'], playersOut => {
-						let firstPlayer = (playersOut || "").split("\n")[0] || "Player";
-						this.labelTitle.set_text(this.line1_stopped.replace('%player%', firstPlayer));
-						this.labelArtist.set_text(this.line2_stopped.replace('%player%', firstPlayer));
-					});
-					showButtons = false;
-					this._lastText = null;
-				} else {
-					// Playing / Paused
-					this._runPlayerctlAsync(['-l'], playersOut => {
-						// build clean array of reported players
-						const playersList = (playersOut || "").split("\n").map(s => s && s.trim()).filter(Boolean);
-
-						const whitelist = (this.playerWhitelist || "").split(",").map(x => x.trim()).filter(Boolean);
-
-						// choose a reported entry where the base name (before '.') matches whitelist (or any if whitelist empty)
-						const pick = playersList.find(p => {
-							if (!p) return false;
-							const base = p.split(".")[0];				 // normalize reported name
-							if (!whitelist.length) return true;			 // no whitelist => accept first valid
-							return this.treatWhitelistAsBlacklist
-								? !whitelist.includes(base)
-								: whitelist.includes(base);
-						}) || null; // null means no concrete pick
-
-						// normalise to base name (e.g. firefox.12345 -> firefox)
-						const firstPlayer = pick ? pick.split(".")[0] : "Player";
-
-						// store normalized current player for tag checks
-						this._currentPlayer = firstPlayer;
-
-						// Build metadata args. If we have a concrete pick (e.g. firefox.12345),
-						// pass --player=pick so it overrides any whitelist flags (playerctl respects the rightmost --player=).
-						const metaArgs = [];
-						if (pick) metaArgs.push(`--player=${pick}`);
-						metaArgs.push('metadata');
-
-						// Fetch full metadata dump and compare to last dump
-						this._runPlayerctlAsync(metaArgs, metadataDump => {
-							const dump = metadataDump || "";
-
-							const metadataChanged = (dump !== this._lastMetadataDump);
-							this._lastMetadataDump = dump;
-
-							if (statusChanged || metadataChanged) {
-								if (this.debugMode) {
-									global.log(`[music-display@nicholasjdi] update triggered (statusChanged=${statusChanged}, metadataChanged=${metadataChanged})`);
-								}
-
-								// Now update text/buttons
-								this._lastMixTitle = null;
-								// yes this is a stupid way to do this but i can't think of a better way
-								if (this.mixDetection) {
-									this._runPlayerctlAsync(['metadata', 'xesam:comment', `--player=${firstPlayer}`], comment => {
-										if (comment.includes('[') && comment.includes(']: ')) {
-											this._runPlayerctlAsync(['position'], time => {
-												const mixTitle = this._grabMixTitleOverride(comment, time);
-												this._lastMixTitle = mixTitle;
-												this._updateText(firstPlayer, mixTitle);
-											});
-										} else this._updateText(firstPlayer);
-									});
-								} else this._updateText(firstPlayer);
-								const isPlaying = (status === "Playing");
-								this._updateButtonTextures(isPlaying);
-							} else if (this.mixDetection) {
-								this._runPlayerctlAsync(['metadata', 'xesam:comment', `--player=${firstPlayer}`], comment => {
-									if (comment.includes('[') && comment.includes(']: ')) {
-										this._runPlayerctlAsync(['position'], time => {
-											const mixTitle = this._grabMixTitleOverride(comment, time);
-											if (mixTitle != this._lastMixTitle) {
-												if (this.debugMode) {
-													global.log(`[music-display@nicholasjdi] text update triggered because the track is a mix`);
-												}
-												this._lastMixTitle = mixTitle;
-												this._updateText(firstPlayer, mixTitle);
-											}
-										});
-
-
-									} else {
-										if (this.debugMode) {
-											global.log(`[music-display@nicholasjdi] no change in metadata/status, (and track is not a mix) skipping update`);
-										}
-									}
-								});
-							} else if (this.debugMode) {
-								global.log(`[music-display@nicholasjdi] no change in metadata/status, skipping update`);
-							}
-						});
-					});
-				}
-
-				// Buttons / spacing (visibility is independent of whether we updated text)
-				if (!showButtons || this.hideAllButtons) {
-					this.buttonVBox.hide();
-					this.spacingWidget.hide();
-				} else {
-					this.buttonVBox.show();
-					this.spacingWidget.show();
-					this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
-					this.hideSkipButtons ? this.skipHBox.hide() : this.skipHBox.show();
-				}
-			});
-		} catch (e) {
-			global.logError(`[music-display@nicholasjdi] _updateStatus exception: ${e}`);
-		} finally {
-			if (this.debugMode) {
-				global.log(`[music-display@nicholasjdi] polling every ${this._currentInterval}s`);
-			}
-			return true
-		}
-	},
-
-	_updateButtonTextures: function (isPlaying) {
 		if (this.debugMode) {
-			global.log(`[music-display@nicholasjdi] Update buttons`);
+			global.log(`[${this.metadata.uuid}] _updateFont`);
 		}
-		const basePath = this.metadata.path + "/textures/";
-		const playTexture = this.btnPlayTexture || basePath + "play.png";
-		const pauseTexture = this.btnPauseTexture || basePath + "pause.png";
-		const prevTexture = this.btnPrevTexture || basePath + "previous.png";
-		const nextTexture = this.btnNextTexture || basePath + "next.png";
+	},
 
-		let playPauseFile = isPlaying ? pauseTexture : playTexture;
-		if (playPauseFile !== this._lastPlayPauseFile || this._lastPlayPauseSize !== this.buttonSize) {
-			this.btnPlayPause.set_child(new St.Icon({
-				gicon: Gio.icon_new_for_string(playPauseFile),
-				icon_size: this.buttonSize
-			}));
-			this.btnPlayPause.height = this.buttonSize;
-			this._lastPlayPauseFile = playPauseFile;
-			this._lastPlayPauseSize = this.buttonSize;
-		}
+	_updateButtons: function () {
+		if (!this.hideAllButtons && this._status !== null && this._status !== undefined) {
+			const basePath = this.metadata.path + "/textures/";
+			const playTexture = this.btnPlayTexture || basePath + "play.png";
+			const pauseTexture = this.btnPauseTexture || basePath + "pause.png";
+			const prevTexture = this.btnPrevTexture || basePath + "previous.png";
+			const nextTexture = this.btnNextTexture || basePath + "next.png";
 
+			let playPauseFile = this._status ? pauseTexture : playTexture;
+			if (playPauseFile !== this._lastPlayPauseFile) {
+				this.btnPlayPause.set_child(new St.Icon({
+					gicon: Gio.icon_new_for_string(playPauseFile),
+					icon_size: this.buttonSize
+				}));
+			}
 
-		if (!this.hideSkipButtons && !this.hideAllButtons) {
 			let skipSize = Math.floor(this.buttonSize / 2);
-			this.btnPrev.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(prevTexture), icon_size: skipSize }));
-			this.btnPrev.height = skipSize;
-			this.btnNext.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(nextTexture), icon_size: skipSize }));
-			this.btnNext.height = skipSize;
+			if (this._lastButtonSize !== this.buttonSize) {
+				this.btnPlayPause.height = this.buttonSize;
+				if (!this.hideSkipButtons) {
+					this.btnPrev.height = skipSize;
+					this.btnNext.height = skipSize;
+				}
+			}
+
+			if (!this.hideSkipButtons) {
+				if (!this._prevNextDone) {
+					this.btnPrev.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(prevTexture), icon_size: skipSize }));
+					this.btnNext.set_child(new St.Icon({ gicon: Gio.icon_new_for_string(nextTexture), icon_size: skipSize }));
+					this._prevNextDone = true;
+				}
+				this.skipHBox.show();
+			} else this.skipHBox.hide();
+
+			this.buttonVBox.show();
+			this.spacingWidget.show();
+			this.spacingWidget.width = Math.max(0, Math.round(this.buttonTextSpacing));
+		} else {
+			this.buttonVBox.hide();
+			this.spacingWidget.hide();
 		}
 	},
 
 	_onPlayPausePressed: function (actor, event) {
 		if (event.get_button() === 1) {
-			GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} play-pause`);
-			this._updateStatus();
+			GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} play-pause`);
 		}
 	},
 
 	_onPrevPressed: function (actor, event) {
 		if (event.get_button() === 1) {
-			GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} previous`);
-			this._updateStatus();
+			GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} previous`);
 		}
 	},
 
 	_onNextPressed: function (actor, event) {
 		if (event.get_button() === 1) {
-			GLib.spawn_command_line_async(`playerctl ${this._getPlayerctlArgsArray().join(' ')} next`);
-			this._updateStatus();
+			GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} next`);
 		}
 	},
 
 	on_desklet_removed: function () {
-		if (this._pollId) {
-			GLib.source_remove(this._pollId);
-			this._pollId = null;
+		for (const process of Object.keys(this._playerctlProcesses)) {
+			this._stopPlayerctl(process);
 		}
 	}
-};
+}
 
 function main(metadata, instance_id) {
 	return new MusicDisplayDesklet(metadata, instance_id);

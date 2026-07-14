@@ -7,7 +7,7 @@
 		"type": "entry",
 		"description": "Format",
 		"default": "%title%",
-		"tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display."
+		"tooltip": "Use %title%, %artist%, %album%, %player%, %{prefix}[player]metadata:key{suffix}% for dynamic display."
 	},
 	"line1_font": {
 		"type": "fontchooser",
@@ -39,7 +39,7 @@
 		"type": "entry",
 		"description": "Format",
 		"default": "%artist%",
-		"tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display."
+		"tooltip": "Use %title%, %artist%, %album%, %player%, %{prefix}[player]metadata:key{suffix}% for dynamic display."
 	},
 	"line2_font": {
 		"type": "fontchooser",
@@ -162,7 +162,7 @@
 		"type": "checkbox",
 		"description": "Mix Detection",
 		"default": false,
-		"tooltip": "Check 'xesam:comment' for lines formatted as \"[(hours):(minutes):(seconds)]: (Title)\"\n\nIf these lines exist it will replace the %title% with the provided title.\nAdditionally when enabled, the %()mix()% tag can be used to grab the xesam:title, if no timestamp lines are provided it will return an empty string.\n\nWARNING: This can decrease performance a lot."
+		"tooltip": "Check 'xesam:comment' for lines formatted as \"[(hours):(minutes):(seconds)]: (Title)\"\n\nIf these lines exist it will replace the %title% with the provided title.\nAdditionally when enabled, the %mix% tag can be used to grab the xesam:title, if no timestamp lines are provided it will return an empty string.\n\nWarning: This can decrease performance a lot."
 	},
 	"empty_values": {
 		"type": "entry",
@@ -174,24 +174,6 @@
 	"head6": {
 		"type": "header",
 		"description": "Player Detection"
-	},
-	"poll_interval": {
-	"type": "scale",
-	"description": "Track polling interval (seconds)",
-	"tooltip": "How often the desklet checks the current track. (playing/paused)\nWARNING: Lower values may heavily effect your system, it is not recommended to go below 1.0 track poll interval.",
-	"default": 1,
-	"min": 0.3,
-	"max": 10,
-	"step": 0.1
-	},
-	"idle_poll_interval": {
-	"type": "scale",
-	"description": "Player polling interval (seconds)",
-	"tooltip": "How often the desklet checks for players. (no player/player stopped)",
-	"default": 3,
-	"min": 1,
-	"max": 10,
-	"step": 0.1
 	},
 	"player_whitelist": {
 		"type": "entry",
