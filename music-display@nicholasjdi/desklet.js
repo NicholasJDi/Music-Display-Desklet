@@ -476,8 +476,24 @@ MusicDisplayDesklet.prototype = {
 					: !node.players.includes(this._currentPlayer)
 				)) return "";
 
-				const metadata = this._getMetadata(node.value);
-				if ((metadata && !node.inversed || !metadata && node.inversed) && !this._emptyValues.includes(metadata)) {
+				let metadata = this._getMetadata(node.value);
+				let match = null;
+				if (typeof node.match === 'string') {
+					if (node.type === 'number') {
+						match = Number(node.match);
+						metadata = Number(metadata);
+					} else match = node.match;
+				}
+
+				if (match  === null ?
+					((node.inversed ? !metadata || !(node.forced || !this._emptyValues.includes(metadata.toString())) : metadata && (node.forced || !this._emptyValues.includes(metadata.toString())))) :
+					(node.mode === '>' ?  (node.inversed ? !(metadata > match) : (metadata > match)) :
+					node.mode === '<' ? (node.inversed ? !(metadata < match) : (metadata < match)) :
+					node.mode === '=>' ? (node.inversed ? !(metadata >= match) : (metadata >= match)) :
+					node.mode === '=<' ? (node.inversed ? !(metadata <= match) : (metadata <= match)) :
+					(node.inversed ? !(metadata === match) : (metadata === match))) &&
+					(!node.forced || !this._emptyValues.includes(metadata.toString()))
+				) {
 					let out = "";
 
 					if (node.prefix)
@@ -489,10 +505,10 @@ MusicDisplayDesklet.prototype = {
 					if (node.suffix)
 						out += this._buildTag(node.suffix);
 
-					return out
+					return out;
 				}
 			}
-			return ""
+			return "";
 		} catch (e) {
 			global.logError(`[${this.metadata.uuid}] _buildTag exception: ${e}`);
 		}
@@ -518,6 +534,13 @@ MusicDisplayDesklet.prototype = {
 			this._metadataTags = [];
 			this._line1Format = this._parseTags(this.line1Format);
 			this._line2Format = this._parseTags(this.line2Format);
+
+			if (this.debugMode) {
+				global.log(`[${this.metadata.uuid}] _parseFormat: ${JSON.stringify({
+					'line1':this._line1Format,
+					'line2':this._line2Format
+				},null,'\t')}`);
+			}
 
 			this._startPlayerctl('metadata', [`--player=${this._currentPlayer || ' -l'}`,
 					'metadata', '--format', [
@@ -547,17 +570,20 @@ MusicDisplayDesklet.prototype = {
 
 		let i = 0;
 
-		const parseSequence = (stopChar = null) => {
+		const parseSequence = () => {
 			const out = [];
 			let literal = "";
+			let isEscaped = false;
 
 			while (i < text.length) {
-				// reached the end of a recursive section
-				if (stopChar && text[i] === stopChar)
-					break;
+				//escape
+				if (text[i] === "\\") {
+					i++;
+					isEscaped = true;
+				}
 
 				// tag
-				if (text[i] === "%") {
+				if (!isEscaped && text[i] === "%") {
 					if (literal.length) {
 						out.push(literal);
 						literal = "";
@@ -567,7 +593,9 @@ MusicDisplayDesklet.prototype = {
 					continue;
 				}
 
-				literal += text[i++];
+				if (text[i] !== undefined)
+					literal += text[i++];
+				isEscaped = false;
 			}
 
 			if (literal.length)
@@ -579,50 +607,92 @@ MusicDisplayDesklet.prototype = {
 		const parseBalanced = (open, close) => {
 			if (text[i] !== open)
 				return [];
-
 			i++; // skip open
 
-			const result = parseSequence(close);
+			const out = [];
+			let literal = "";
+			let d = 0;
+			let isEscaped = false;
+			
+			while (i < text.length) {
+				//escape
+				if (text[i] === "\\") {
+					i++;
+					isEscaped = true;
+				}
+
+				// check for imbalances
+				if (!isEscaped && text[i] === open) d++;
+				
+				// close at balenced closer
+				if (!isEscaped && text[i] === close) {
+					if (d-- === 0) {
+						break;
+					}
+				}
+				
+				// tag
+				if (!isEscaped && text[i] === "%") {
+					if (literal.length) {
+						out.push(literal);
+						literal = "";
+					}
+
+					out.push(parseTag());
+					continue;
+				}
+
+				if (text[i] !== undefined)
+					literal += text[i++];
+				isEscaped = false;
+			}
+
+			if (literal.length)
+				out.push(literal);
 
 			if (text[i] !== close)
-				return result;
-
+				return out;
 			i++; // skip close
 
-			return result;
+			return out;
 		}
-
+		
 		const parseTag = () => {
 			if (text[i] !== "%")
 				return {};
-
-			i++; // opening %
+			const start = i++; // opening %
 
 			const node = {};
 
 			// prefix
 			if (text[i] === "{") {
 				const prefix = parseBalanced("{", "}");
-				if (prefix.length !== 0) node.prefix = prefix
+				if (prefix.length !== 0) node.prefix = prefix;
 			}
 
 			// players
 			if (text[i] === "!") {
-				node.blacklist = true;
-				i++
-			}
+				i++;
+				if (text[i] === "[") node.blacklist = true;
+				else i--;			}
 			if (text[i] === "[") {
 				const players = parseBalanced("[", "]").join('');
-				if (players.length !== 0) node.players = players.split(",").map(s => s.trim()).filter(Boolean)
+				if (players.length !== 0) node.players = players.split(",").map(s => s.trim()).filter(Boolean);
+			}
+
+			// force
+			if (text[i] === "!") {
+				node.forced = true;
+				i++;
 			}
 
 			// conditionals
 			if (text[i] === "?") {
 				node.conditional = true;
-				i++
+				i++;
 				if (text[i] === "?") {
 					node.inversed = true;
-					i++
+					i++;
 				}
 			}
 
@@ -636,30 +706,70 @@ MusicDisplayDesklet.prototype = {
 				value += text[i++];
 			}
 
-			if (Object.keys(tags).includes(value.trim()) || this.TAG_REGEX.test(value.trim())){
-				node.value = value.trim();}
-			else {
+			if (Object.keys(tags).includes(value.trim()) || this.TAG_REGEX.test(value.trim())) {
+				node.value = value.trim();
+			} else {
 				const tag = 'xesam:' + value.trim();
 				if (this.TAG_REGEX.test(tag)) node.value = tag;
-				else return "";
+				else return text.slice(start,i);
 			}
 
-			// suffix
 			if (text[i] === "{") {
-				const suffix = parseBalanced("{", "}");
-				if (suffix.length !== 0) node.suffix = suffix
+				// match condition
+				if (node.conditional) {
+					i++;
+					let match = "";
+
+					while (
+						i < text.length &&
+						text[i] !== "}" &&
+						text[i] !== "%"
+					) {
+						match += text[i++];
+					}
+					node.match = match;
+					if (text[i] === "}") i++;
+					if (text[i] === "*") {
+						node.type = 'number';
+						i++;
+					}
+					if (text[i] === "=") {
+						i++
+						if (text[i] === ">") {
+							node.mode = '=>'
+							i++
+						}
+						if (text[i] === "<") {
+							node.mode = '=<'
+							i++
+						}
+					} else {
+						if (text[i] === ">") {
+							node.mode = '>'
+							i++
+						}
+						if (text[i] === "<") {
+							node.mode = '<'
+							i++
+						}
+					}
+				} else {
+					// suffix
+					const suffix = parseBalanced("{", "}");
+					if (suffix.length !== 0) node.suffix = suffix;
+				}
 			}
 
 			if (text[i] !== "%")
-				return "";
-
+				return text.slice(start,i);
 			i++; // closing %
 
-			// built in tags
+			// metadata marking
 			if (this.TAG_REGEX.test(node.value)) {
 				if (!this._metadataTags.includes(node.value))
 					this._metadataTags.push(node.value);
 			} else {
+				// built in tags
 				for (const tag of tags[node.value]) {
 					if (!this._metadataTags.includes(tag))
 						this._metadataTags.push(tag);
