@@ -138,7 +138,6 @@ MusicDisplayDesklet.prototype = {
 					timeout = null;
 				}
 				this._reload();
-				this._updateStatus();
 			})
 		);
 	},
@@ -400,7 +399,6 @@ MusicDisplayDesklet.prototype = {
 				this.labelArtist.set_text("");
 				this._getPlayerctlArgs();
 				this._startPlayerctl('status', ['status'], Lang.bind(this, this._updateStatus));
-				this._parseFormat();
 			}
 		} catch (e) {
 			global.logError(`[${this.metadata.uuid}] _reload exception: ${e}`);
@@ -542,7 +540,7 @@ MusicDisplayDesklet.prototype = {
 				},null,'\t')}`);
 			}
 
-			this._startPlayerctl('metadata', [`--player=${this._currentPlayer || ' -l'}`,
+			this._startPlayerctl('metadata', [`--player=${this._currentPlayer}`,
 					'metadata', '--format', [
 						this._metadataTags.map(t => t = '{{' + t + '}}').join(this.PLAYERCTL_SPLIT),
 						`\n${this.PLAYERCTL_END}`
