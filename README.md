@@ -1,59 +1,59 @@
 # Music-Display Desklet
 A Linux Mint Cinnamon Desklet for displaying what is currently being played by Players supporting the MPRIS D-Bus Specification such as Rhythmbox, Firefox, Spotify, and more, using the playerctl command-line utility.
-
->Note: The Code is really messy cause i do NOT know Javascript, this is my first time ever using it. (i know even less about CJS) But it works and i'm happy with it :D (also this was made with quite a lot of help from ChatGPT.)
 ## Instillation
 Go to your Desklets folder `~/.local/share/cinnamon/desklets` (or create it if it doesn't exist) and run `git clone https://github.com/NicholasJDi/Music-Display-Desklet`, go inside the generated folder and drag out the `music-display@nicholasjdi` folder into the Desklets folder and delete the `Music-Display-Desklet` folder, run `sudo apt install playerctl` and you should be good to go! (of course enable the Desklet)
 
-I'm not sure what versions this is supported by so any help figuring that out would be appreciated, but i built this on Linux Mint 21.3 with Cinnamon 6.0.4 sorry if this doesn't work on your version.
+I'm not sure what versions this is supported by so any help figuring that out would be appreciated, but i built this on Linux Mint 22.2 with Cinnamon 6.4.8 sorry if this doesn't work on your version.
 ## Configuration
-Music-Display Desklet is as configurable as i could get it. (without it being really performance heavy) 
-
 Desklet looks like this by default:<br>
 <img width="164" height="98" alt="Screenshot from 2025-09-08 08-43-38" src="https://github.com/user-attachments/assets/c7ed5d39-02f2-465a-8b24-719284d118dd" />
 
 You can fully configure both text lines, you can do something like this:<br>
-<img width="242" height="78" alt="Screenshot from 2025-09-08 08-50-30" src="https://github.com/user-attachments/assets/2858b670-cd22-4200-aea3-288e345a4a41" />
+<img width="242" height="78" alt="Screenshot from 2025-09-08 08-50-30" src="https://github.com/user-attachments/assets/2858b670-cd22-4200-aea3-288e345a4a41" /><br><br>
 
 For both lines you can change: format, font, font size, and font color.
 
 ### Format
-#### %title%
-The Title of the Track.
-#### %artist%
-The Artist who made the Track.
-#### %album%
-The Album the Track is from.
-#### %player%
-The Player the Track is being played from. (rhytmbox,firefox,spotify. Note: this is the only Tag that is processed when the Player is Stopped)
-#### Custom Tags
-Custom Tags are VERY powerful, they are formatted as %(prefix)[player]metadata:key(suffix)%
-##### (prefix)/(suffix)
-If metadata:key returns a valid Value (prefix) will be Prepended to the Tag and (suffix) will be Appended to the Tag. (prefix/suffix can have Custom Tags within them.)
-##### [player]
-The Player the Track must be played from for a Custom Tag to activate, leave empty to allow the Tag to activate for all Players (the same as %player%)
+#### Tags
+The Tags System is VERY powerful, they are formatted as `%{prefix}[player]metadata:key{suffix}%`
 ##### metadata:key
-The Metadata Key to grab from. (xesam:trackNumber)<br>
-Run: `playerctl metadata` to show Metadata for the current Track.
+The Metadata Key to grab from, if `metadata:` is not provided it will be treated as `xesam:tag` automatically,<br>
+additionally there a few built-in tags.<br>
+- title: shows `xesam:title` unless [Mix Detection](#mix-detection) is enabled and the track is recognized as a mix, then it will display the Mix Title.<br>
+- mix: displays nothing unless [Mix Detection](#mix-detection) is enabled and the track is recognized as a mix, then it will display `xesam:title`.<br>
+- player: displays the name of the current player.<br>
+(built-in tags are used as `%title%`, metadata:key is the only required section of the tag.)<br>
+
+The functions and variables that playerctl provides are also supported (lc(xesam:title), uc(xesam:album), position, volume), If you set metadata:tag to be `(anything)` whatever you put in the brackets will be directly given to playerctl so you can do things like `%(position / 1000000)%` to get seconds.<br>
+Prefix metadata:tag with `!` to ignore the [Empty Values](#empty-values).
+
+Run `playerctl metadata` to show Metadata for the current Track.
+##### [player]
+The Player(s) the Track must be played from for a tag to activate, don't include to allow the tag to activate for all Players. (the current player is the same as %player%)<br>
+Prefix `[player]` with `!` to make it a blacklist instead of a whitelist. (`![vlc,spotify]`)
+##### {prefix}/{suffix}
+If metadata:key equates to a valid Value {prefix} will be Prepended to the tag and {suffix} will be Appended to the tag. (prefix/suffix can have Tags within them. `%{by }artist{%( - )album%}%`)
+##### Conditional Tags
+To make a tag conditional prefix metadata:tag with `?`, this makes it so anything placed in {prefix} will be shown if metadata:tag evaluates to a valid Value.<br>
+If metadata:tag is instead prefixed with `??` the condition will be inversed (prefix shown when metadata:tag evaluates to an invalid Value)<br>
+
+In a Conditional Tag anything placed in the {suffix} will be compared to what metadata:tag evaluates to, tags within the match suffix will be treated as plain text.<br>
+If the comparison succeeds {prefix} will be shown, [Empty Values](#empty-values) are always ignored in match tags, to make them ignored in normal conditional tags prefix metadata:tag with `!` as well (`!?`). (adding a `!` to a match tag makes it respect the [Empty Values](#empty-values) but its not very useful)
 #### Example
-Using all of these tags we can set line 1 to "%title%" and set line 2 to "%(by )[]xesam:artist(%( - )[]xesam:album(%( #%()[]xesam:discNumber(-)%)[]xesam:trackNumber()%)%)%" to show:<br>
-<img width="1366" height="768" alt="Screenshot from 2025-11-30 14-43-59" src="https://github.com/user-attachments/assets/875064dc-e524-465f-878a-70b70ff7601e" />
+Using all of these tags we can set line 1 to "%title%" and set line 2 to "%{by }artist{%{ - }album{%{ | %discNumber{-}%}trackNumber%}%}%" to show:<br>
+<img width="1366" height="768" alt="Screenshot from 2025-11-30 14-43-59" src="https://github.com/user-attachments/assets/875064dc-e524-465f-878a-70b70ff7601e" /><br>
 for Rhythmbox, Firefox and Spotify. (i'm using rhythmbox in these examples. Note: VLC has really bad Metadata support, that's why its not referenced here.)
 ### Tag Settings
 #### Mix Detection
 Check 'xesam:comment' for lines formatted as "[(hours):(minutes):(seconds)]: (Title)"
 
 If these lines exist it will replace the %title% with the provided title.<br>
-Additionally when enabled, the %()mix()% tag can be used to grab the xesam:title, if no timestamp lines are provided it will return an empty string.
+Additionally when enabled, the %mix% tag can be used to grab the xesam:title, if no timestamp lines are provided it will return an empty string.
 
 This can decrease performance a lot.
 #### Empty Values
 A Comma-separated list of Values to treat as `null` in Custom Format Tags (Unknown,None,N/A,0)
 ### Player Settings
-#### Track Polling Interval
-The Interval for how often Track data is updated. (Playing/Paused)
-#### Player Polling Interval
-The Interval for how often Players are checked for. (No Player/Stopped)
 #### Allowed Players
 A Comma-separated list of allowed Players. (rhythmbox,spotify)
 #### Treat Whitelist As Blacklist
@@ -139,7 +139,7 @@ The Directory to fetch Art Overrides from, Files are formatted as "(Artist) - (T
 #### Mix Detection
 Check 'xesam:comment' for lines formatted as "[(hours):(minutes):(seconds)]: (Title)"
 
-If these lines exist it will use the provided title for overides.<br>
+If these lines exist it will use the provided title for overrides.<br>
 (this can also be used to set overrides that do not rely on xesam:title which is nice.)
 
 This can decrease performance a lot.
@@ -147,12 +147,10 @@ This can decrease performance a lot.
 #### Time Polling Interval
 How often the Desklet checks Time and Art. (lower values make time grabbing more accurate)
 #### Player Polling Interval
-How often the desklet checks for Players.
+How often the Desklet checks for Players.
 #### Player Whitelist
 A Comma-separated list of allowed Players. (rhythmbox,spotify)
 #### Treat Whitelist As Blacklist
 Whether or not to treat the Whitelist as a Blacklist
 ### Example
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/0a3accd3-59ef-4e14-98a0-75a11741e1dc" />
-
-
