@@ -57,7 +57,7 @@ MusicDisplayDesklet.prototype = {
 		this.nextPreviousMenuItemsVisible = true
 		this.stopPlayerMenuItemVisible = true
 
-		// Tag Regex
+		// Constants
 		this.TAG_REGEX = /^(?:(lc|uc|duration|markup_escape|default|emoji|trunc|)\((.+)\)|([A-Za-z0-9]+:[A-Za-z0-9]+|position|volume|status|loop|shuffle|playerName))$/i;
 		this.PLAYERCTL_END = '⹳Ḓ聉飪狮୳欖叁⚟ᦎ멭஺莎혠濨';
 		this.PLAYERCTL_SPLIT = 'ꡉ弄⛟퐂�掙᭻淛ᛈ䔻뇉况륚賈';
@@ -138,68 +138,11 @@ MusicDisplayDesklet.prototype = {
 					timeout = null;
 				}
 				this._reload();
+				this._updateStatus();
 			})
 		);
 	},
-
-	_checkPlayerctlInstalled: function () {
-		return !!GLib.find_program_in_path("playerctl");
-	},
-
-	_buildContextMenu: function () {
-		if (this.openPlayerMenuItem == null) {
-			// Build Context Menu
-			// Context Menu Open Player
-			this.openPlayerMenuItem = new PopupMenu.PopupMenuItem(this.openPlayerMenuItemName);
-			this._menu.addMenuItem(this.openPlayerMenuItem)
-			this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-			// Context Menu Play/Pause Track
-			this.playPauseMenuItem = this._menu.addAction(_('Play/Pause Track'), Lang.bind(this, function () {
-				GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} play-pause`);
-			}));
-			// Context Menu Next Track
-			this.nextMenuItem = this._menu.addAction(_('Next Track'), Lang.bind(this, function () {
-				GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} next`);
-			}));
-			// Context Menu Previous Track
-			this.previousMenuItem = this._menu.addAction(_('Previous Track'), Lang.bind(this, function () {
-				GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} previous`);
-			}));
-			// Context Menu Stop Player
-			this.stopPlayerMenuItem = this._menu.addAction(_('Stop Player'), Lang.bind(this, function () {
-				GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} stop`);
-			}));
-			this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-			// Context Menu Reload Desklet
-			this.reloadMenuItem = this._menu.addAction(_('Reload'), Lang.bind(this, function () {
-				this._reload();
-			}));
-		}
-		// update open player menu item content
-		if (this.openPlayerMenuItem) {
-			// update label
-			this.openPlayerMenuItem.label.set_text(this.openPlayerMenuItemName);
-
-			// create command handler
-			if (this.openPlayerMenuItemSignal) {
-				this.openPlayerMenuItem.disconnect(this.openPlayerMenuItemSignal);
-			}
-
-			this.openPlayerMenuItemSignal = this.openPlayerMenuItem.connect(
-				'activate',
-				Lang.bind(this, function () {
-					GLib.spawn_command_line_async(this.openPlayerMenuItemCommand);
-				})
-			);
-		}
-		// update visibility
-		this.openPlayerMenuItem.actor.visible = this.openPlayerMenuItemVisible;
-		this.playPauseMenuItem.actor.visible = this.playPauseMenuItemVisible;
-		this.nextMenuItem.actor.visible = this.nextPreviousMenuItemsVisible;
-		this.previousMenuItem.actor.visible = this.nextPreviousMenuItemsVisible;
-		this.stopPlayerMenuItem.actor.visible = this.stopPlayerMenuItemVisible;
-	},
-
+	
 	_bindSettings: function () {
 		const settings = this.settings;
 		const bind = Lang.bind;
@@ -257,6 +200,64 @@ MusicDisplayDesklet.prototype = {
 		settings.bind("treat_whitelist_as_blacklist", "treatWhitelistAsBlacklist", bind(this, this._reload));
 
 		settings.bind("debug_mode", "debugMode", null);
+	},
+
+	_buildContextMenu: function () {
+		if (this.openPlayerMenuItem == null) {
+			// Build Context Menu
+			// Context Menu Open Player
+			this.openPlayerMenuItem = new PopupMenu.PopupMenuItem(this.openPlayerMenuItemName);
+			this._menu.addMenuItem(this.openPlayerMenuItem)
+			this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+			// Context Menu Play/Pause Track
+			this.playPauseMenuItem = this._menu.addAction(_('Play/Pause Track'), Lang.bind(this, function () {
+				GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} play-pause`);
+			}));
+			// Context Menu Next Track
+			this.nextMenuItem = this._menu.addAction(_('Next Track'), Lang.bind(this, function () {
+				GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} next`);
+			}));
+			// Context Menu Previous Track
+			this.previousMenuItem = this._menu.addAction(_('Previous Track'), Lang.bind(this, function () {
+				GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} previous`);
+			}));
+			// Context Menu Stop Player
+			this.stopPlayerMenuItem = this._menu.addAction(_('Stop Player'), Lang.bind(this, function () {
+				GLib.spawn_command_line_async(`playerctl ${this._playerctlArgs.join(' ')} stop`);
+			}));
+			this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+			// Context Menu Reload Desklet
+			this.reloadMenuItem = this._menu.addAction(_('Reload'), Lang.bind(this, function () {
+				this._reload();
+			}));
+		}
+		// update open player menu item content
+		if (this.openPlayerMenuItem) {
+			// update label
+			this.openPlayerMenuItem.label.set_text(this.openPlayerMenuItemName);
+
+			// create command handler
+			if (this.openPlayerMenuItemSignal) {
+				this.openPlayerMenuItem.disconnect(this.openPlayerMenuItemSignal);
+			}
+
+			this.openPlayerMenuItemSignal = this.openPlayerMenuItem.connect(
+				'activate',
+				Lang.bind(this, function () {
+					GLib.spawn_command_line_async(this.openPlayerMenuItemCommand);
+				})
+			);
+		}
+		// update visibility
+		this.openPlayerMenuItem.actor.visible = this.openPlayerMenuItemVisible;
+		this.playPauseMenuItem.actor.visible = this.playPauseMenuItemVisible;
+		this.nextMenuItem.actor.visible = this.nextPreviousMenuItemsVisible;
+		this.previousMenuItem.actor.visible = this.nextPreviousMenuItemsVisible;
+		this.stopPlayerMenuItem.actor.visible = this.stopPlayerMenuItemVisible;
+	},
+
+	_checkPlayerctlInstalled: function () {
+		return !!GLib.find_program_in_path("playerctl");
 	},
 
 	_getPlayerctlArgs: function () {
@@ -387,6 +388,7 @@ MusicDisplayDesklet.prototype = {
 				this.spacingWidget.hide();
 				this.labelTitle.set_text("playerctl is not installed");
 				this.labelArtist.set_text("Use command: sudo apt install playerctl\nRight click this desklet and press 'Reload'");
+				this._updateStatus();
 				return;
 			} else {
 				this._lastLine1Text = null;
@@ -421,7 +423,7 @@ MusicDisplayDesklet.prototype = {
 					this._lastPlayer = this._currentPlayer;
 					this._parseFormat();
 				}
-				if (this._status === null || this._status === undefined) this._updateText();
+				if (this._status === null || this._status === undefined || this._currentPlayer !== this._lastPlayer) this._updateText();
 			});
 		} catch (e) {
 			global.logError(`[${this.metadata.uuid}] _updateStatus exception: ${e}`);
@@ -732,23 +734,23 @@ MusicDisplayDesklet.prototype = {
 						i++;
 					}
 					if (text[i] === "=") {
-						i++
+						i++;
 						if (text[i] === ">") {
-							node.mode = '=>'
-							i++
+							node.mode = '=>';
+							i++;
 						}
 						if (text[i] === "<") {
-							node.mode = '=<'
-							i++
+							node.mode = '=<';
+							i++;
 						}
 					} else {
 						if (text[i] === ">") {
-							node.mode = '>'
-							i++
+							node.mode = '>';
+							i++;
 						}
 						if (text[i] === "<") {
-							node.mode = '<'
-							i++
+							node.mode = '<';
+							i++;
 						}
 					}
 				} else {
@@ -783,11 +785,11 @@ MusicDisplayDesklet.prototype = {
 	_updateMetadata: function (tags) {
 		try {
 			for (let i = tags.length - 1; i >= 0; i--) {
-				this._metadata[this._metadataTags[i]] = tags[i]
+				this._metadata[this._metadataTags[i]] = tags[i];
 			}
-			this._updateText()
+			this._updateText();
 		} catch (e) {
-			global.logError(`[${this.metadata.uuid}] _updateText exception: ${e}`);
+			global.logError(`[${this.metadata.uuid}] _updateMetadata exception: ${e}`);
 		}
 	},
 
@@ -952,6 +954,7 @@ MusicDisplayDesklet.prototype = {
 		for (const process of Object.keys(this._playerctlProcesses)) {
 			this._stopPlayerctl(process);
 		}
+		this.settings.finalize();
 	}
 }
 
