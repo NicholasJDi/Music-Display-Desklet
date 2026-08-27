@@ -262,9 +262,9 @@ MusicDisplayDesklet.prototype = {
 
 	_getPlayerctlArgs: function () {
 		this._playerctlArgs = [
-			this.treatWhitelistAsBlacklist ?
+			(this.treatWhitelistAsBlacklist ?
 				'--ignore-player=' :
-				'--player=' +
+				'--player=') +
 				this.playerWhitelist.split(",")
 					.map(s => s.trim())
 					.filter(Boolean)
@@ -418,7 +418,7 @@ MusicDisplayDesklet.prototype = {
 			this._updateButtons();
 
 			this._runPlayerctl(['-l'], list => {
-				this._currentPlayer = list.split('\n')[0].split(".", 2)[0];
+				this._currentPlayer = list?.split('\n')[0]?.split(".", 2)[0] || null;
 				if (this._currentPlayer !== this._lastPlayer) {
 					this._lastPlayer = this._currentPlayer;
 					this._parseFormat();
@@ -544,7 +544,7 @@ MusicDisplayDesklet.prototype = {
 
 			this._startPlayerctl('metadata', [`--player=${this._currentPlayer}`,
 					'metadata', '--format', [
-						this._metadataTags.map(t => t = '{{' + t + '}}').join(this.PLAYERCTL_SPLIT),
+						this._metadataTags.map(tag => '{{' + tag + '}}').join(this.PLAYERCTL_SPLIT),
 						`\n${this.PLAYERCTL_END}`
 					].join(''),
 				],
