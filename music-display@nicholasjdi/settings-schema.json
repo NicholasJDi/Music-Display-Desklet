@@ -7,7 +7,7 @@
 		"type": "entry",
 		"description": "Format",
 		"default": "%title%",
-		"tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display."
+		"tooltip": "Use %title%, %artist%, %album%, %player%, %{prefix}[player]metadata:key{suffix}% for dynamic display."
 	},
 	"line1_font": {
 		"type": "fontchooser",
@@ -39,7 +39,7 @@
 		"type": "entry",
 		"description": "Format",
 		"default": "%artist%",
-		"tooltip": "Use %title%, %artist%, %album%, %player%, %(prefix)[player]metadata:key(suffix)% for dynamic display."
+		"tooltip": "Use %title%, %artist%, %album%, %player%, %{prefix}[player]metadata:key{suffix}% for dynamic display."
 	},
 	"line2_font": {
 		"type": "fontchooser",
@@ -87,12 +87,12 @@
 		"default": false
 	},
 	"button_size": {
-	"type": "spinbutton",
-	"description": "Button size (pixels)",
-	"default": 34,
-	"min": 8,
-	"max":500,
-	"step": 1
+		"type": "spinbutton",
+		"description": "Button size (pixels)",
+		"default": 34,
+		"min": 8,
+		"max":500,
+		"step": 1
 	},
 	"btn_play_texture": {
 		"type": "filechooser",
@@ -162,7 +162,7 @@
 		"type": "checkbox",
 		"description": "Mix Detection",
 		"default": false,
-		"tooltip": "Check 'xesam:comment' for lines formatted as \"[(hours):(minutes):(seconds)]: (Title)\"\n\nIf these lines exist it will replace the %title% with the provided title.\nAdditionally when enabled, the %()mix()% tag can be used to grab the xesam:title, if no timestamp lines are provided it will return an empty string.\n\nWARNING: This can decrease performance a lot."
+		"tooltip": "Check 'xesam:comment' for lines formatted as \"[(hours):(minutes):(seconds)]: (Title)\"\n\nIf these lines exist it will replace the %title% with the provided title.\nAdditionally when enabled, the %mix% tag can be used to grab the xesam:title, if no timestamp lines are provided it will return an empty string.\n\nThis can decrease performance a lot."
 	},
 	"empty_values": {
 		"type": "entry",
@@ -175,29 +175,11 @@
 		"type": "header",
 		"description": "Player Detection"
 	},
-	"poll_interval": {
-	"type": "scale",
-	"description": "Track polling interval (seconds)",
-	"tooltip": "How often the desklet checks the current track. (playing/paused)\nWARNING: Lower values may heavily effect your system, it is not recommended to go below 1.0 track poll interval.",
-	"default": 1,
-	"min": 0.3,
-	"max": 10,
-	"step": 0.1
-	},
-	"idle_poll_interval": {
-	"type": "scale",
-	"description": "Player polling interval (seconds)",
-	"tooltip": "How often the desklet checks for players. (no player/player stopped)",
-	"default": 3,
-	"min": 1,
-	"max": 10,
-	"step": 0.1
-	},
 	"player_whitelist": {
 		"type": "entry",
 		"description": "Player whitelist",
 		"default": "rhythmbox,spotify",
-		"tooltip":"Comma-separated list of allowed players, the leftmost player will take priority."
+		"tooltip":"Comma-separated list of allowed players, the leftmost player will take priority. (use '%any' to allow any registered player)"
 	},
 	"treat_whitelist_as_blacklist": {
 		"type": "checkbox",
@@ -210,7 +192,7 @@
 		"description": ""
 	},
 	"debug_mode": {
-	"type": "checkbox",
+		"type": "checkbox",
 		"description": "Debug Mode",
 		"default": false,
 		"tooltip":"Log debug outputs in cinnamon log"
