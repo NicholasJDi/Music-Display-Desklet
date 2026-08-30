@@ -54,11 +54,10 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this.outlineSize = "4";
 		this.outlineColor = "black";
 
-		
 		// Constants
 		this.PLAYERCTL_END = '⹳Ḓ聉飪狮୳欖叁⚟ᦎ멭஺莎혠濨';
 		this.PLAYERCTL_SPLIT = 'ꡉ弄⛟퐂�掙᭻淛ᛈ䔻뇉况륚賈';
-		
+
 		// Cache
 		this._soupSession = new Soup.Session();
 		this._playerctlProcesses = {};
@@ -66,7 +65,6 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this._metadata = {};
 		this._metadataTags = [];
 		this._failArt = false;
-		this._lastMixTitle = null;
 		this._imageSize = {width: 10, height: 10};
 		this._artSize = null;
 
@@ -159,7 +157,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 
 		// Text Settings
-		settings.bind("text_enabled", "textEnabled", bind(this, this._updateTime));
+		settings.bind("text_enabled", "textEnabled", bind(this, this._reload));
 		settings.bind("format", "timeFormat", bind(this, this._updateTime));
 		settings.bind("font", "font", bind(this, this._updateFont));
 		settings.bind("color", "color", bind(this, this._updateFont));
@@ -178,16 +176,15 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 
 		// Art Settings
-		settings.bind("art_enabled", "artEnabled", bind(this, this._updateStatus));
+		settings.bind("art_enabled", "artEnabled", bind(this, this._reload));
 		settings.bind("margin", "marginSize", bind(this, this._updateLayout));
 		settings.bind("margin_color", "marginColor", bind(this, this._updateLayout));
 		settings.bind("background_color", "backgroundColor", bind(this, this._updateLayout));
 		settings.bind("art_position", "artPosition", bind(this, this._updateLayout));
 
-		settings.bind("overrides_enabled", "overridesEnabled", bind(this, this._updateStatus));
+		settings.bind("overrides_enabled", "overridesEnabled", bind(this, this._reload));
 		settings.bind("art_dir", "overridesDirectory", bind(this, this._updateStatus));
-		settings.bind("mix_detection", "mixDetection", bind(this, this._updateStatus));
-
+		settings.bind("mix_detection", "mixDetection", bind(this, this._reload));
 	},
 
 	_checkPlayerctlInstalled: function () {
@@ -291,45 +288,43 @@ MusicDisplayAdditionsDesklet.prototype = {
 		try {
 			this.checkbox.setToggleState(this.disabled);
 			this.overridesCheckbox.setToggleState(this.overridesEnabled);
-			if (!this._checkPlayerctlInstalled()) {
+
+			this._lastArtUrl = null;
+			this._lastMixTitle = null;
+			this._lastTimeText = null;
+			this._metadata = {};
+
+			this._updateLayout();
+			this._updateFont();
+			this._updateStatus();
+
+			if (this._checkPlayerctlInstalled() && !this.disabled) {
+				this._getPlayerctlArgs();
+				this._startPlayerctl('player', ['status', '--format', '{{ playerName }}'],
+				player => {
+					this._currentPlayer = player;
+					this._metadataTags = [
+						...this.artEnabled ? ['mpris:artUrl'] : [],
+						...this.overridesEnabled ? ['xesam:title','xesam:artist'] : [],
+						...this.overridesEnabled && this.mixDetection ? ['xesam:comment'] : [],
+						...this.textEnabled || (this.overridesEnabled && this.mixDetection) ? ['position / 1000000'] : [],
+						...this.textEnabled ? ['mpris:length / 1000000'] : []
+					];
+
+					this._startPlayerctl('main', [`--player=${this._currentPlayer}`,
+						'metadata', '--format', [
+								this._metadataTags.map(tag => '{{' + tag + '}}').join(this.PLAYERCTL_SPLIT),
+								`\n${this.PLAYERCTL_END}`
+							].join('')
+						],
+						tags => this._updateMetadata(tags.split(this.PLAYERCTL_SPLIT)),
+						true
+					);
+				});
+			} else {
 				for (const process of Object.keys(this._playerctlProcesses)) {
 					this._stopPlayerctl(process);
 				}
-
-				return;
-			} else if (!this.disabled) {
-				this._lastArtUrl = null;
-				this._lastMixTitle = null;
-				this._lastTimeText = null;
-				this._metadata = {};
-
-				this._updateLayout();
-				this._updateFont();
-				this._updateStatus();
-
-				this._metadataTags = [
-					...this.artEnabled ? ['mpris:artUrl'] : [],
-					...this.overridesEnabled ? ['xesam:title','xesam:artist'] : [],
-					...this.overridesEnabled && this.mixDetection ? ['xesam:comment'] : [],
-					...this.textEnabled || (this.overridesEnabled && this.mixDetection) ? ['position / 1000000'] : [],
-					...this.textEnabled ? ['mpris:length / 1000000'] : []
-				];
-
-				this._getPlayerctlArgs();
-				this._startPlayerctl('main', ['metadata',
-					'--format', [
-							this._metadataTags.map(tag => '{{' + tag + '}}').join(this.PLAYERCTL_SPLIT),
-							`\n${this.PLAYERCTL_END}`
-						].join('')
-					],
-					tags => this._updateMetadata(tags.split(this.PLAYERCTL_SPLIT)),
-					true
-				);
-			} else {
-				this._stopPlayerctl('main');
-				this._updateLayout();
-				this._updateFont();
-				this._updateStatus();
 			}
 		} catch (e) {
 			global.logError(`[${this.metadata.uuid}] _reload exception: ${e}`);
@@ -373,7 +368,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 	_updateArt: function (mixTitle = null) {
 		let artUrl = this._metadata['mpris:artUrl'];
 		// If overrides are enabled, try to find a local override image
-		if (this.overridesEnabled && this.overridesDirectory) {			
+		if (this.overridesEnabled && this.overridesDirectory) {
 			let safeArtist = (this._metadata['xesam:artist'] || 'unknown').replace(/[/\\?%*:|"<>]/g, '_');
 			let safeTitle = (mixTitle ? mixTitle : (this._metadata['xesam:title'] || 'unknown')).replace(/[/\\?%*:|"<>]/g, '_');
 			const exts = ['png','jpg','jpeg','webp'];
