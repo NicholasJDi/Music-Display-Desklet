@@ -273,10 +273,6 @@ MusicDisplayDesklet.prototype = {
 
 	_startPlayerctl: function (id, argsArray, callback, multiLine, emptyCall) {
 		try {
-			if (emptyCall) {
-				callback("");
-			}
-
 			const argv = [
 				'playerctl',
 				...this._playerctlArgs,
@@ -385,14 +381,9 @@ MusicDisplayDesklet.prototype = {
 				this._startPlayerctl('status', ['status', '--format',
 					'{{ status }}||||{{ playerName }}'],
 				thing => {
-					global.log(thing)
-					if (thing) {
-						const things = thing.split('||||',2);
-						this._updateStatus(things[0], things[1]);
-					} else {
-						this._updateStatus(undefined, null);
-					}
-				}, false, true);
+					const things = thing.split('||||',2);
+					this._updateStatus(things[0], things[1]);
+				});
 			}
 		} catch (e) {
 			global.logError(`[${this.metadata.uuid}] _reload exception: ${e}`);

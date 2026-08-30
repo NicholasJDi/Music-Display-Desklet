@@ -205,10 +205,6 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	_startPlayerctl: function (id, argsArray, callback, multiLine, emptyCall) {
 		try {
-			if (emptyCall) {
-				callback("");
-			}
-
 			const argv = [
 				'playerctl',
 				...this._playerctlArgs,
@@ -331,7 +327,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 								].join('')
 							],
 							tags => {
-								if (tags) {
+								if (tags) { 
 									this._updateMetadata(tags.split(this.PLAYERCTL_SPLIT));
 								} else {
 									this._updateMetadata(this._metadataTags.map(() => null));
