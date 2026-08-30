@@ -310,7 +310,7 @@ MusicDisplayDesklet.prototype = {
 					this._playerctlProcesses[id].stopped)
 					return;
 
-				stdout.read_line_async(GLib.PRIORITY_DEFAULT, null, (stream, res) => {
+				stdout.read_line_async(GLib.PRIORITY_DEFAULT_IDLE, null, (stream, res) => {
 					try {
 						const follow = this._playerctlProcesses[id];
 						if (!follow || follow.stopped)
