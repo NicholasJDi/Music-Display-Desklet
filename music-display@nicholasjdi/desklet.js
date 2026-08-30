@@ -68,7 +68,7 @@ MusicDisplayDesklet.prototype = {
 		this._currentPlayer = null;
 		this._line1Format = null;
 		this._line2Format = null;
-		this._status = null;
+		this._status = undefined;
 		this._mixTitle = null;
 		this._metadata = {};
 		this._metadataTags = [];
@@ -271,7 +271,7 @@ MusicDisplayDesklet.prototype = {
 		];
 	},
 
-	_startPlayerctl: function (id, argsArray, callback, multiLine) {
+	_startPlayerctl: function (id, argsArray, callback, multiLine, emptyCall) {
 		try {
 			const argv = [
 				'playerctl',
@@ -319,6 +319,9 @@ MusicDisplayDesklet.prototype = {
 
 						if (multiLine) {
 							if (line === this.PLAYERCTL_END) {
+								callback(out);
+								out = "";
+							} else if (emptyCall && line === '') {
 								callback(out);
 								out = "";
 							} else if (out === '') out += line;
@@ -527,8 +530,14 @@ MusicDisplayDesklet.prototype = {
 						`\n${this.PLAYERCTL_END}`
 					].join(''),
 				],
-				tags => this._updateMetadata(tags.split(this.PLAYERCTL_SPLIT)),
-				true
+				tags => {
+					if (tags) {
+						this._updateMetadata(tags.split(this.PLAYERCTL_SPLIT));
+					} else {
+						this._updateMetadata(this._metadataTags.map(() => ""));
+					}
+				},
+				true, true
 			);
 		} catch (e) {
 			global.logError(`[${this.metadata.uuid}] _parseFormat exception: ${e}`);
