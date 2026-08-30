@@ -307,6 +307,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 				];
 
 				this._currentPlayer = null;
+				this._lastPlayer = null;
 				this._lastArtUrl = null;
 				this._lastMixTitle = null;
 				this._lastTimeText = null;
