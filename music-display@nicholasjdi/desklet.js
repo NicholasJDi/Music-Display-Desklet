@@ -58,7 +58,7 @@ MusicDisplayDesklet.prototype = {
 		this.stopPlayerMenuItemVisible = true
 
 		// Constants
-		this.TAG_REGEX = /^(?:(lc|uc|duration|markup_escape|default|emoji|trunc|)\((.+)\)|([A-Za-z0-9]+:[A-Za-z0-9]+|position|volume|status|loop|shuffle|playerName))$/i;
+		this.TAG_REGEX = /^(?:(lc|uc|duration|markup_escape|default|emoji|trunc|)\((.+)\)|([A-Za-z0-9]+:[A-Za-z0-9_]+|position|volume|status|loop|shuffle|playerName))$/i;
 		this.PLAYERCTL_END = '⹳Ḓ聉飪狮୳欖叁⚟ᦎ멭஺莎혠濨';
 		this.PLAYERCTL_SPLIT = 'ꡉ弄⛟퐂�掙᭻淛ᛈ䔻뇉况륚賈';
 
@@ -138,11 +138,10 @@ MusicDisplayDesklet.prototype = {
 					timeout = null;
 				}
 				this._reload();
-				this._updateStatus();
 			})
 		);
 	},
-	
+
 	_bindSettings: function () {
 		const settings = this.settings;
 		const bind = Lang.bind;
@@ -272,31 +271,6 @@ MusicDisplayDesklet.prototype = {
 		];
 	},
 
-	_runPlayerctl: function (argsArray, callback) {
-		try {
-			const argv = ['playerctl', ...this._playerctlArgs, ...argsArray];
-
-			let proc = new Gio.Subprocess({
-				argv: argv,
-				flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
-			});
-
-			proc.init(null);
-			proc.communicate_utf8_async(null, null, (procObj, res) => {
-				try {
-					let [ok, stdout, stderr] = procObj.communicate_utf8_finish(res);
-					callback(ok && stdout ? stdout.toString().trim() : "");
-				} catch (e) {
-					global.logError(`[${this.metadata.uuid}] _runPlayerctl.read exception: ${e}`);
-					callback("");
-				}
-			});
-		} catch (e) {
-			global.logError(`[${this.metadata.uuid}] _runPlayerctl exception: ${e}`);
-			callback("");
-		}
-	},
-
 	_startPlayerctl: function (id, argsArray, callback, multiLine) {
 		try {
 			const argv = [
@@ -388,43 +362,48 @@ MusicDisplayDesklet.prototype = {
 				this.spacingWidget.hide();
 				this.labelTitle.set_text("playerctl is not installed");
 				this.labelArtist.set_text("Use command: sudo apt install playerctl\nRight click this desklet and press 'Reload'");
-				this._updateStatus();
 				return;
 			} else {
 				this._lastLine1Text = null;
 				this._lastLine2Text = null;
 				this._lastPlayPauseFile = null;
 				this._lastButtonSize = null;
+				this._lastPlayer = null;
 
 				this._updateFont();
 				this.labelTitle.set_text("Loading...");
 				this.labelArtist.set_text("");
+
 				this._getPlayerctlArgs();
-				this._startPlayerctl('status', ['status'], Lang.bind(this, this._updateStatus));
+				this._startPlayerctl('status', ['status', '--format',
+					'{{ status }}||||{{ playerName }}'],
+				thing => {
+					const things = thing.split('||||',2);
+					this._updateStatus(things[0], things[1]);
+				});
 			}
 		} catch (e) {
 			global.logError(`[${this.metadata.uuid}] _reload exception: ${e}`);
 		}
 	},
 
-	_updateStatus: function (status) {
+	_updateStatus: function (status, player) {
 		try {
 			if (status === "Stopped") this._status = null;
 			else if (!status) this._status = undefined;
 			else this._status = status === "Playing";
 			if (this.debugMode) {
-				global.log(`[${this.metadata.uuid}] _updateStatus: ${this._status}${status ? " (" + status + ")" : ''}`);
+				global.log(`[${this.metadata.uuid}] _updateStatus: ${this._status}${status ? " (" + status + ")" : ''} [${player}]`);
 			}
 			this._updateButtons();
 
-			this._runPlayerctl(['-l'], list => {
-				this._currentPlayer = list?.split('\n')[0]?.split(".", 2)[0] || null;
-				if (this._currentPlayer !== this._lastPlayer) {
-					this._lastPlayer = this._currentPlayer;
-					this._parseFormat();
-				}
-				if (this._status === null || this._status === undefined || this._currentPlayer !== this._lastPlayer) this._updateText();
-			});
+			this._currentPlayer = player;
+			if (this._currentPlayer !== this._lastPlayer) {
+				this._lastPlayer = this._currentPlayer;
+				this._parseFormat();
+			}
+
+			if (this._status === null || this._status === undefined) this._updateText();
 		} catch (e) {
 			global.logError(`[${this.metadata.uuid}] _updateStatus exception: ${e}`);
 		}
@@ -613,7 +592,7 @@ MusicDisplayDesklet.prototype = {
 			let literal = "";
 			let d = 0;
 			let isEscaped = false;
-			
+
 			while (i < text.length) {
 				//escape
 				if (text[i] === "\\") {
@@ -623,14 +602,14 @@ MusicDisplayDesklet.prototype = {
 
 				// check for imbalances
 				if (!isEscaped && text[i] === open) d++;
-				
+
 				// close at balenced closer
 				if (!isEscaped && text[i] === close) {
 					if (d-- === 0) {
 						break;
 					}
 				}
-				
+
 				// tag
 				if (!isEscaped && text[i] === "%") {
 					if (literal.length) {
@@ -656,7 +635,7 @@ MusicDisplayDesklet.prototype = {
 
 			return out;
 		}
-		
+
 		const parseTag = () => {
 			if (text[i] !== "%")
 				return {};
