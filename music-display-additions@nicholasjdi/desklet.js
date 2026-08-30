@@ -888,7 +888,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	on_failCheckbox_toggled: function (checkbox, value) {
 		this._failArt = value;
-		this._reload();
+		this._updateLayout();
 	},
 
 	on_desklet_removed: function () {
