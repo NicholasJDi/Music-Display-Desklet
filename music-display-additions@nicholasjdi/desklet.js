@@ -72,6 +72,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this._lastArtUrl = null;
 		this._lastTimeText = null;
 		this._lastMixTitle = null;
+		this._lastPlayer = null;
 
 		// Settings
 		this.settings = new Settings.DeskletSettings(this, this.metadata.uuid, instance_id);
@@ -128,6 +129,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		this._menu.addAction(_('Reload'), Lang.bind(this, this._reload));
 
 		// Initial setup
+		this._setTimeText(" ");
 		let timeout = GLib.timeout_add(
 			GLib.PRIORITY_DEFAULT_IDLE,
 			0,
@@ -312,7 +314,6 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 				this._updateLayout();
 				this._updateFont();
-				this._updateStatus();
 
 				this._getPlayerctlArgs();
 				this._startPlayerctl('player', ['status', '--format', '{{ playerName }}'],
@@ -323,7 +324,9 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 					this._currentPlayer = player;
 
-					if (this._currentPlayer) {
+					if (this._currentPlayer && this._currentPlayer !== this._lastPlayer) {
+						this._lastPlayer = this._currentPlayer;
+
 						this._startPlayerctl('main', [`--player=${this._currentPlayer}`,
 							'metadata', '--format', [
 									this._metadataTags.map(tag => '{{' + tag + '}}').join(this.PLAYERCTL_SPLIT),
@@ -339,7 +342,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 							},
 							true, true
 						);
-					} else {
+					} else if (!this._currentPlayer) {
 						this._stopPlayerctl('main');
 
 						this._lastArtUrl = null;
@@ -349,7 +352,10 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 						this._updateLayout();
 						this._updateFont();
-						this._updateStatus();
+						if (this._lastPlayer !== null) {
+							this._lastPlayer = null;
+							this._updateStatus();
+						}
 					}
 				});
 			} else {
@@ -365,7 +371,10 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 				this._updateLayout();
 				this._updateFont();
-				this._updateStatus();
+				if (this._lastPlayer !== null) {
+					this._lastPlayer = null;
+					this._updateStatus();
+				}
 			}
 		} catch (e) {
 			global.logError(`[${this.metadata.uuid}] _reload exception: ${e}`);
@@ -549,7 +558,6 @@ MusicDisplayAdditionsDesklet.prototype = {
 					this.outlineLabels[2].set_position(anchorX, Math.round(anchorY - this.outlineSize));
 					this.outlineLabels[3].set_position(anchorX, Math.round(anchorY + this.outlineSize));
 				}
-				return false;
 			})
 		);
 	},
@@ -716,7 +724,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 					}
 					this._loadArtFromFile(artUrl);
 				}
-			} else if (typeof artUrl !== "string" && this._lastArtUrl !== null) {
+			} else if (!artUrl && this._lastArtUrl !== null) {
 				this._lastArtUrl = null;
 				this._updateLayout();
 			}

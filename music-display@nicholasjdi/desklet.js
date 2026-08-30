@@ -385,7 +385,6 @@ MusicDisplayDesklet.prototype = {
 				this._startPlayerctl('status', ['status', '--format',
 					'{{ status }}||||{{ playerName }}'],
 				thing => {
-					global.log(thing)
 					if (thing) {
 						const things = thing.split('||||',2);
 						this._updateStatus(things[0], things[1]);
