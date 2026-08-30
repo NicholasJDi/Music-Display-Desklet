@@ -203,7 +203,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 		];
 	},
 
-	_startPlayerctl: function (id, argsArray, callback, multiLine) {
+	_startPlayerctl: function (id, argsArray, callback, multiLine, emptyCall) {
 		try {
 			const argv = [
 				'playerctl',
@@ -253,6 +253,9 @@ MusicDisplayAdditionsDesklet.prototype = {
 							if (line === this.PLAYERCTL_END) {
 								callback(out);
 								out = "";
+							} else if (emptyCall && line === '') {
+								callback(out);
+								out = "";
 							} else if (out === '') out += line;
 							else out += `\n${line}`;
 
@@ -288,43 +291,77 @@ MusicDisplayAdditionsDesklet.prototype = {
 		try {
 			this.checkbox.setToggleState(this.disabled);
 			this.overridesCheckbox.setToggleState(this.overridesEnabled);
-
-			this._lastArtUrl = null;
-			this._lastMixTitle = null;
-			this._lastTimeText = null;
-			this._metadata = {};
-
-			this._updateLayout();
-			this._updateFont();
-			this._updateStatus();
-
 			if (this._checkPlayerctlInstalled() && !this.disabled) {
+				this._metadataTags = [
+					...this.artEnabled ? ['mpris:artUrl'] : [],
+					...this.overridesEnabled ? ['xesam:title','xesam:artist'] : [],
+					...this.overridesEnabled && this.mixDetection ? ['xesam:comment'] : [],
+					...this.textEnabled || (this.overridesEnabled && this.mixDetection) ? ['position / 1000000'] : [],
+					...this.textEnabled ? ['mpris:length / 1000000'] : []
+				];
+
+				this._currentPlayer = null;
+				this._lastArtUrl = null;
+				this._lastMixTitle = null;
+				this._lastTimeText = null;
+				this._metadata = {};
+
+				this._updateLayout();
+				this._updateFont();
+				this._updateStatus();
+
 				this._getPlayerctlArgs();
 				this._startPlayerctl('player', ['status', '--format', '{{ playerName }}'],
 				player => {
-					this._currentPlayer = player;
-					this._metadataTags = [
-						...this.artEnabled ? ['mpris:artUrl'] : [],
-						...this.overridesEnabled ? ['xesam:title','xesam:artist'] : [],
-						...this.overridesEnabled && this.mixDetection ? ['xesam:comment'] : [],
-						...this.textEnabled || (this.overridesEnabled && this.mixDetection) ? ['position / 1000000'] : [],
-						...this.textEnabled ? ['mpris:length / 1000000'] : []
-					];
+					if (this.debugMode) {
+						global.log(`[${this.metadata.uuid}] player changed: ${player ?? "none"}`);
+					}
 
-					this._startPlayerctl('main', [`--player=${this._currentPlayer}`,
-						'metadata', '--format', [
-								this._metadataTags.map(tag => '{{' + tag + '}}').join(this.PLAYERCTL_SPLIT),
-								`\n${this.PLAYERCTL_END}`
-							].join('')
-						],
-						tags => this._updateMetadata(tags.split(this.PLAYERCTL_SPLIT)),
-						true
-					);
+					this._currentPlayer = player;
+
+					if (this._currentPlayer) {
+						this._startPlayerctl('main', [`--player=${this._currentPlayer}`,
+							'metadata', '--format', [
+									this._metadataTags.map(tag => '{{' + tag + '}}').join(this.PLAYERCTL_SPLIT),
+									`\n${this.PLAYERCTL_END}`
+								].join('')
+							],
+							tags => {
+								if (tags) { 
+									this._updateMetadata(tags.split(this.PLAYERCTL_SPLIT));
+								} else {
+									this._updateMetadata(this._metadataTags.map(() => null));
+								}
+							},
+							true, true
+						);
+					} else {
+						this._stopPlayerctl('main');
+
+						this._lastArtUrl = null;
+						this._lastMixTitle = null;
+						this._lastTimeText = null;
+						this._metadata = {};
+
+						this._updateLayout();
+						this._updateFont();
+						this._updateStatus();
+					}
 				});
 			} else {
 				for (const process of Object.keys(this._playerctlProcesses)) {
 					this._stopPlayerctl(process);
 				}
+
+				this._currentPlayer = null;
+				this._lastArtUrl = null;
+				this._lastMixTitle = null;
+				this._lastTimeText = null;
+				this._metadata = {};
+
+				this._updateLayout();
+				this._updateFont();
+				this._updateStatus();
 			}
 		} catch (e) {
 			global.logError(`[${this.metadata.uuid}] _reload exception: ${e}`);
@@ -355,12 +392,12 @@ MusicDisplayAdditionsDesklet.prototype = {
 				}
 				if (!mixTitle) this._updateArt()
 			} else this._updateArt();
-		} else if (this._lastArtUrl !== null) {
+		} else if (this._lastArtUrl !== null || !this._currentPlayer) {
 			this._updateArt();
 		}
 		if (!this.disabled && this.textEnabled) {
 			this._updateTime();
-		} else if (this._lastTimeText !== null) {
+		} else if (this._lastTimeText !== null || !this._currentPlayer) {
 			this._updateTime();
 		}
 	},
@@ -610,8 +647,8 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 	_grabMixTitleOverride: function (text, time) {
 		try {
-			if (!text || text == "") return null;
-			if (!time) return null;
+			if (!text) return null;
+			if (typeof time !== "number") return null;
 
 			// Parse timestamped lines
 			const lines = text.split(/\r?\n/);
@@ -675,7 +712,7 @@ MusicDisplayAdditionsDesklet.prototype = {
 					}
 					this._loadArtFromFile(artUrl);
 				}
-			} else if (!artUrl && this._lastArtUrl !== null) {
+			} else if (typeof artUrl !== "string" && this._lastArtUrl !== null) {
 				this._lastArtUrl = null;
 				this._updateLayout();
 			}
@@ -732,8 +769,9 @@ MusicDisplayAdditionsDesklet.prototype = {
 
 					this.art.set_content(image);
 
-					if (this.debugMode) global.log(`[${this.metadata.uuid}] loaded art from file: ${localPath}`);
-
+					if (this.debugMode) {
+						global.log(`[${this.metadata.uuid}] loaded art from file: ${localPath}`);
+					}
 				} catch (e) {
 					this._lastArtUrl = null;
 					this._updateLayout();
