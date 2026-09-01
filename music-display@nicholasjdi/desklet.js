@@ -325,9 +325,8 @@ MusicDisplayDesklet.prototype = {
 							if (line === this.PLAYERCTL_END) {
 								callback(out);
 								out = "";
-							} else if (emptyCall && line === '') {
-								callback(out);
-								out = "";
+							} else if (emptyCall && !line && !out) {
+								callback("");
 							} else if (out === '') out += line;
 							else out += `\n${line}`;
 
