@@ -144,10 +144,6 @@ If these lines exist it will use the provided title for overrides.<br>
 
 This can decrease performance a lot.
 ### Player Settings
-#### Time Polling Interval
-How often the Desklet checks Time and Art. (lower values make time grabbing more accurate)
-#### Player Polling Interval
-How often the Desklet checks for Players.
 #### Player Whitelist
 A Comma-separated list of allowed Players. (rhythmbox,spotify)
 #### Treat Whitelist As Blacklist
